@@ -26,13 +26,13 @@ const PAGE = `<!doctype html>
   html, body { margin: 0; background: transparent; overflow: hidden; }
   .pill {
     position: fixed; inset: 0;
-    display: flex; align-items: center; justify-content: center;
+    display: flex; align-items: center; justify-content: center; gap: 9px;
     font: 500 12.5px 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
     color: #e8f4f2;
   }
   .pill__body {
-    display: flex; align-items: center; gap: 8px;
-    padding: 6px 15px 6px 7px; border-radius: 999px;
+    display: flex; align-items: center; gap: 9px;
+    padding: 7px 16px 7px 11px; border-radius: 999px;
     background: rgba(10, 15, 16, 0.92);
     border: 1px solid rgba(69, 224, 210, 0.20);
     box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45), 0 0 22px rgba(69, 224, 210, 0.10);
@@ -42,76 +42,82 @@ const PAGE = `<!doctype html>
     border-color: rgba(225, 74, 60, 0.35);
     box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
   }
-  #label { white-space: nowrap; max-width: ${WIDTH - 70}px; overflow: hidden; text-overflow: ellipsis; }
   #orb { display: block; flex: none; }
+  #label { white-space: nowrap; max-width: ${WIDTH - 70}px; overflow: hidden; text-overflow: ellipsis; }
+  /* The wave: live mic levels while recording — proof the mic hears you,
+     where a static "Listening" only claims it. */
+  #bars { display: none; align-items: center; gap: 3.5px; height: 20px; }
+  #bars i { width: 3.5px; height: 4px; border-radius: 2px; background: #a9ece5;
+            transition: height 70ms linear; }
+  .recording #label { display: none; }
+  .recording #bars { display: flex; }
 </style></head>
 <body>
   <div id="pill" class="pill recording"><div class="pill__body">
     <canvas id="orb"></canvas><span id="label">Listening</span>
+    <span id="bars"><i></i><i></i><i></i><i></i><i></i></span>
   </div></div>
   <script>
-    /* The wisp itself — three orbs circling, drawn live. While recording its
-       spin, glow and orbit swell with the real mic levels: proof the mic
-       hears you, where a static "Listening" only claims it (the same honest
-       job the old wave bars did). Transcribing is a calm steady drift;
-       an error freezes it gray. */
+    /* The dot is a wisp: a glowing teal core whose halo swells with the
+       voice and breathes softly through silence — alive the whole take,
+       never mechanical. Transcribing keeps the slow breath with no voice
+       in it; an error dims it to a gray standstill. The bars carry the
+       per-band levels, same as ever. */
+    var barEls = document.querySelectorAll('#bars i')
     var canvas = document.getElementById('orb')
     var ctx = canvas.getContext('2d')
-    var S = 32
+    var S = 20
     var dpr = Math.min(2, window.devicePixelRatio || 1)
     canvas.width = S * dpr; canvas.height = S * dpr
     canvas.style.width = S + 'px'; canvas.style.height = S + 'px'
     ctx.scale(dpr, dpr)
 
     var mode = 'recording'
-    var target = 0   /* latest mic level, 0..1 */
-    var energy = 0   /* smoothed toward target — no jitter, no lag worth naming */
-    var angle = 0
+    var target = 0   /* latest peak mic level, 0..1 */
+    var energy = 0   /* smoothed toward target — swells fast, settles soft */
+    var t = 0
 
     function setState(m, message) {
       mode = m
       document.getElementById('pill').className = 'pill ' + m
       document.getElementById('label').textContent =
         message || (m === 'recording' ? 'Listening' : 'Transcribing')
-      if (m !== 'recording') target = 0
+      if (m !== 'recording') { target = 0; levels([0, 0, 0, 0, 0]) }
     }
     function levels(bands) {
       var peak = 0
-      for (var i = 0; i < bands.length; i++) peak = Math.max(peak, bands[i] || 0)
-      target = Math.max(0, Math.min(1, peak))
+      for (var i = 0; i < barEls.length; i++) {
+        var v = Math.max(0, Math.min(1, bands[i] || 0))
+        peak = Math.max(peak, v)
+        barEls[i].style.height = (4 + v * 14) + 'px'
+      }
+      target = peak
     }
-    function dot(x, y, r, alpha) {
-      var reach = r * 2.6
-      var g = ctx.createRadialGradient(x, y, 0, x, y, reach)
+    function draw() {
+      requestAnimationFrame(draw)
+      t += 0.016
+      energy += (target - energy) * (target > energy ? 0.35 : 0.08)
+      ctx.clearRect(0, 0, S, S)
+      var c = S / 2
+      /* The breath keeps it alive through silence; the voice overrides it. */
+      var breath = 0.5 + 0.5 * Math.sin(t * 2.4)
+      var glow = mode === 'error' ? 0.25 : 0.3 + breath * 0.15 + energy * 0.55
+      var halo = 4.5 + breath * 0.8 + energy * 4.5
+      var core = 2.4 + energy * 1.2
+      var g = ctx.createRadialGradient(c, c, 0, c, c, halo + core)
       if (mode === 'error') {
-        g.addColorStop(0, 'rgba(150, 158, 157, ' + alpha + ')')
+        g.addColorStop(0, 'rgba(170, 176, 175, 0.8)')
+        g.addColorStop(0.4, 'rgba(150, 158, 157, 0.25)')
         g.addColorStop(1, 'rgba(150, 158, 157, 0)')
       } else {
-        g.addColorStop(0, 'rgba(216, 255, 249, ' + alpha + ')')
-        g.addColorStop(0.4, 'rgba(69, 224, 210, ' + alpha * 0.75 + ')')
+        g.addColorStop(0, 'rgba(216, 255, 249, 0.95)')
+        g.addColorStop(0.28, 'rgba(69, 224, 210, ' + glow + ')')
         g.addColorStop(1, 'rgba(69, 224, 210, 0)')
       }
       ctx.fillStyle = g
       ctx.beginPath()
-      ctx.arc(x, y, reach, 0, 6.2832)
+      ctx.arc(c, c, halo + core, 0, 6.2832)
       ctx.fill()
-    }
-    function draw() {
-      requestAnimationFrame(draw)
-      var goal = mode === 'recording' ? target : mode === 'transcribing' ? 0.22 : 0
-      energy += (goal - energy) * 0.15
-      if (mode !== 'error') angle += 0.02 + energy * 0.11
-      ctx.clearRect(0, 0, S, S)
-      var R = 8 + energy * 3
-      for (var i = 0; i < 3; i++) {
-        var a = angle + i * 2.0944
-        for (var k = 4; k >= 1; k--) {
-          var ta = a - k * 0.17
-          dot(16 + Math.cos(ta) * R, 16 + Math.sin(ta) * R, 1.8,
-              0.12 * (5 - k) / 5 * (0.4 + energy))
-        }
-        dot(16 + Math.cos(a) * R, 16 + Math.sin(a) * R, 2.6 + energy * 1.4, 0.9)
-      }
     }
     draw()
   </script>
