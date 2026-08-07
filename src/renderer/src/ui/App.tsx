@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { HistoryEntry, KeyStatus, Stats, WhispSettings } from '../../../shared/ipc'
+import logoUrl from '../../../../resources/logo-128.png'
 
 /**
  * The settings window — whisp's whole visible surface. Four tabs over the
  * same small data set: the key and toggles (General), the vocabulary prompt
  * (Dictionary), recent transcripts (History), and the tally (Stats). All of
  * it re-fetches on main's dataChanged push, so a dictation landing while
- * the window is open updates History and Stats live.
+ * the window is open updates History and Stats live — and flares the wisp
+ * in the sidebar, which is how the app says "heard you" without a toast.
  */
 
 type Tab = 'general' | 'dictionary' | 'history' | 'stats'
@@ -38,6 +40,8 @@ async function fetchAll(): Promise<Data> {
 export function App(): React.JSX.Element {
   const [tab, setTab] = useState<Tab>('general')
   const [data, setData] = useState<Data | null>(null)
+  const [flare, setFlare] = useState(false)
+  const flareTimer = useRef<number | null>(null)
 
   const refresh = useCallback(() => {
     void fetchAll().then(setData)
@@ -45,7 +49,16 @@ export function App(): React.JSX.Element {
 
   useEffect(() => {
     refresh()
-    return window.whisp.onDataChanged(refresh)
+    const off = window.whisp.onDataChanged(() => {
+      refresh()
+      setFlare(true)
+      if (flareTimer.current !== null) window.clearTimeout(flareTimer.current)
+      flareTimer.current = window.setTimeout(() => setFlare(false), 1100)
+    })
+    return () => {
+      off()
+      if (flareTimer.current !== null) window.clearTimeout(flareTimer.current)
+    }
   }, [refresh])
 
   if (!data) return <div className="app" />
@@ -53,9 +66,9 @@ export function App(): React.JSX.Element {
   return (
     <div className="app">
       <nav className="sidebar">
-        <div className="brand">
-          <span className="brand__dot" />
-          whisp
+        <div className={`brand${flare ? ' brand--flare' : ''}`}>
+          <img className="brand__mark" src={logoUrl} alt="" width={30} height={30} />
+          <span className="brand__name">whisp</span>
         </div>
         {TABS.map((t) => (
           <button
@@ -67,7 +80,9 @@ export function App(): React.JSX.Element {
           </button>
         ))}
         <div className="sidebar__hint">
-          Hold <kbd>Ctrl</kbd>+<kbd>Win</kbd> anywhere, speak, release.
+          Hold <kbd>Ctrl</kbd>+<kbd>Win</kbd> anywhere.
+          <br />
+          Speak. Release.
         </div>
       </nav>
       <main className="content">
@@ -114,13 +129,14 @@ function General({ data, refresh }: { data: Data; refresh: () => void }): React.
       <h1>General</h1>
 
       <div className="card">
-        <h2>OpenAI API key</h2>
+        <h2 className="eyebrow">OpenAI API key</h2>
         <p className="muted">
           Dictation transcribes over the OpenAI API (gpt-4o-mini-transcribe, ~$0.003 per minute of
           speech). The key is stored encrypted on this machine and never leaves the main process.
         </p>
         <div className="row">
           <input
+            className="mono"
             type="password"
             placeholder={key.configured ? `Configured — ends in …${key.last4}` : 'sk-…'}
             value={draft}
@@ -139,15 +155,17 @@ function General({ data, refresh }: { data: Data; refresh: () => void }): React.
           )}
         </div>
         <p className={key.configured ? 'status status--ok' : 'status status--warn'}>
-          {key.configured ? `Key configured (…${key.last4})` : 'No key yet — dictation is inert until one is saved.'}
+          {key.configured
+            ? `Key configured (…${key.last4})`
+            : 'No key yet — dictation is inert until one is saved.'}
         </p>
       </div>
 
       <div className="card">
-        <h2>Behavior</h2>
+        <h2 className="eyebrow">Behavior</h2>
         <Toggle
           label="Mic-ready tick"
-          hint="A near-subliminal chirp when the microphone is actually capturing — words spoken before it are lost."
+          hint="A near-subliminal chirp when the microphone is actually capturing — anything said before it plays is lost."
           checked={settings.chime}
           onChange={(v) => void window.whisp.settings.set({ chime: v })}
         />
@@ -175,7 +193,12 @@ function Toggle({
 }): React.JSX.Element {
   return (
     <label className="toggle">
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <span className="switch">
+        <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+        <span className="switch__track">
+          <span className="switch__knob" />
+        </span>
+      </span>
       <span>
         <span className="toggle__label">{label}</span>
         <span className="toggle__hint">{hint}</span>
@@ -231,7 +254,7 @@ function Dictionary({ data }: { data: Data }): React.JSX.Element {
           {words.map((word) => (
             <span key={word} className="chip">
               {word}
-              <button className="chip__x" title="Remove" onClick={() => remove(word)}>
+              <button className="chip__x" title={`Remove ${word}`} onClick={() => remove(word)}>
                 ×
               </button>
             </span>
@@ -271,7 +294,9 @@ function History({ data }: { data: Data }): React.JSX.Element {
       />
       {history.length === 0 ? (
         <p className="empty">
-          {settings.keepHistory ? 'No dictations yet.' : 'History is off.'}
+          {settings.keepHistory
+            ? 'No dictations yet — hold Ctrl+Win and speak.'
+            : 'History is off.'}
         </p>
       ) : (
         <ul className="history">
@@ -348,7 +373,7 @@ function StatsTab({ stats }: { stats: Stats }): React.JSX.Element {
       <div className="stat-cards">
         {cards.map((card) => (
           <div key={card.title} className="card stat-card">
-            <h2>{card.title}</h2>
+            <h2 className="eyebrow">{card.title}</h2>
             <dl>
               <div>
                 <dt>Dictations</dt>

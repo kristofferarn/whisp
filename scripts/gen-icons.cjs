@@ -298,6 +298,12 @@ drawDisc(recording, 23.5, 23.5, 8, [0xe1, 0x4a, 0x3c], 1)
 
 const muted = fadeAlpha(idle, 0.35)
 
+// A small mark for the settings UI — the 1.4MB master has no business
+// being bundled into the renderer for a 28px sidebar image.
+const uiMark = resize(mark, 128, 128)
+writeFileSync(join(resources, 'logo-128.png'), encodePng(128, 128, uiMark.rgba))
+console.log('wrote resources/logo-128.png')
+
 writeFileSync(join(resources, 'tray-idle.png'), encodePng(TRAY, TRAY, idle.rgba))
 writeFileSync(join(resources, 'tray-recording.png'), encodePng(TRAY, TRAY, recording.rgba))
 writeFileSync(join(resources, 'tray-muted.png'), encodePng(TRAY, TRAY, muted.rgba))
