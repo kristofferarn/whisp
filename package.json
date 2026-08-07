@@ -1,0 +1,32 @@
+{
+  "name": "whisp",
+  "version": "0.1.0",
+  "description": "System-wide push-to-talk dictation for Windows — hold Ctrl+Win, speak, release",
+  "author": "Kristoffer Arntzen",
+  "main": "./out/main/index.js",
+  "private": true,
+  "scripts": {
+    "postinstall": "install-electron",
+    "dev": "electron-vite dev",
+    "build": "tsc --noEmit && electron-vite build",
+    "typecheck": "tsc --noEmit",
+    "start": "electron-vite preview",
+    "smoke:ffi": "electron ./scripts/ffi-smoke.cjs",
+    "gen:icons": "node ./scripts/gen-icons.cjs"
+  },
+  "dependencies": {
+    "koffi": "^3.1.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^5.2.0",
+    "electron": "^43.3.0",
+    "electron-vite": "^5.0.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "typescript": "^7.0.2",
+    "vite": "^7.3.6"
+  }
+}
