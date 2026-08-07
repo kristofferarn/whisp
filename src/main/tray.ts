@@ -7,9 +7,11 @@ import { dictationMuted, setDictationMuted } from './dictation'
  * and, with the red dot, the minimum honest UI: the one place "you are being
  * recorded" always lives.
  *
- * The icons are generated placeholders (scripts/gen-icons.cjs) until real
- * art exists: idle is a warm gray dot, recording red, muted the idle dot at
- * low opacity — present, deliberately not listening.
+ * The icons are derived from the wisp mark (resources/logo.png) by
+ * scripts/gen-icons.cjs: idle is the mark, recording adds the red badge —
+ * with the window hidden, the tray is the only place "you are being
+ * recorded" always lives — and muted is the mark at 35%: present,
+ * deliberately not listening.
  */
 
 import trayIdle from '../../resources/tray-idle.png?asset'

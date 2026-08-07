@@ -28,7 +28,7 @@ npm run dev        # run the app
 npm run typecheck  # tsc --noEmit
 npm run build      # typecheck + electron-vite build
 npm run smoke:ffi  # verify koffi + user32 under Electron's ABI
-npm run gen:icons  # regenerate placeholder tray icons
+npm run gen:icons  # derive tray icons + whisp.ico from resources/logo.png
 ```
 
 The OpenAI API key is entered in Settings (opens automatically on first run)

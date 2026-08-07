@@ -3,3 +3,8 @@ declare module '*.png?asset' {
   const path: string
   export default path
 }
+
+declare module '*.ico?asset' {
+  const path: string
+  export default path
+}

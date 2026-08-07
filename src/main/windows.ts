@@ -12,6 +12,8 @@ import { BrowserWindow, shell } from 'electron'
  *   Opens from the tray, closes for real; the tray keeps the app alive.
  */
 
+import appIcon from '../../resources/whisp.ico?asset'
+
 const preloadPath = join(__dirname, '../preload/index.js')
 
 function loadPage(win: BrowserWindow, page: string): void {
@@ -48,6 +50,7 @@ export function openSettingsWindow(): BrowserWindow {
     minHeight: 480,
     autoHideMenuBar: true,
     backgroundColor: '#161310',
+    icon: appIcon,
     webPreferences: { preload: preloadPath }
   })
   settingsWin.on('closed', () => {
