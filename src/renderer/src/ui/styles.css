@@ -1,17 +1,18 @@
-/* whisp settings — the wisp's world: deep night surfaces, teal
- * bioluminescence as material. Glow is reserved for what's alive or
- * interactive (the mark, focus, the primary action); everything else stays
- * quiet. Data speaks in monospace — the terminal-adjacent voice of the tool.
+/* whisp settings — neutral night chrome; the wisp's teal is an accent, not
+ * an atmosphere. It appears only where something is interactive or alive:
+ * the mark, focus, the primary action, the enabled switch, the active tab.
+ * Every surface, border and body text stays colorless. Data speaks in
+ * monospace — the terminal-adjacent voice of the tool.
  */
 
 :root {
-  --night: #0c1112;
-  --night-raised: #121a1b;
-  --night-hover: #182324;
-  --edge: rgba(140, 235, 226, 0.1);
-  --edge-strong: rgba(140, 235, 226, 0.22);
-  --mist: #e8f4f2;
-  --mist-dim: #8fa6a3;
+  --night: #121214;
+  --night-raised: #1a1a1c;
+  --night-hover: #222225;
+  --edge: rgba(255, 255, 255, 0.08);
+  --edge-strong: rgba(255, 255, 255, 0.17);
+  --mist: #ebeced;
+  --mist-dim: #9b9ea0;
   --wisp: #45e0d2;
   --wisp-core: #d8fff9;
   --wisp-deep: #0d3f3a;
@@ -52,10 +53,7 @@ body {
 .app {
   display: flex;
   height: 100%;
-  /* A faint glow low in the night — the wisp is somewhere in this fog. */
-  background:
-    radial-gradient(520px 320px at 12% 108%, rgba(69, 224, 210, 0.07), transparent 70%),
-    var(--night);
+  background: var(--night);
 }
 
 /* Sidebar ---------------------------------------------------------------- */
@@ -194,7 +192,7 @@ kbd {
 }
 
 .content::-webkit-scrollbar-thumb:hover {
-  background: var(--wisp-deep);
+  background: #2c2c30;
 }
 
 h1 {
@@ -291,7 +289,7 @@ button {
 
 button:hover:not(:disabled) {
   background: var(--night-hover);
-  border-color: var(--wisp-deep);
+  border-color: rgba(255, 255, 255, 0.28);
 }
 
 button:disabled {

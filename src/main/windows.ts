@@ -49,7 +49,7 @@ export function openSettingsWindow(): BrowserWindow {
     minWidth: 640,
     minHeight: 480,
     autoHideMenuBar: true,
-    backgroundColor: '#0c1112',
+    backgroundColor: '#121214',
     icon: appIcon,
     webPreferences: { preload: preloadPath }
   })

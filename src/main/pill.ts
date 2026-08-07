@@ -28,14 +28,14 @@ const PAGE = `<!doctype html>
     position: fixed; inset: 0;
     display: flex; align-items: center; justify-content: center; gap: 9px;
     font: 500 12.5px 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
-    color: #e8f4f2;
+    color: #ebeced;
   }
   .pill__body {
     display: flex; align-items: center; gap: 9px;
     padding: 7px 16px 7px 11px; border-radius: 999px;
-    background: rgba(10, 15, 16, 0.92);
-    border: 1px solid rgba(69, 224, 210, 0.20);
-    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45), 0 0 22px rgba(69, 224, 210, 0.10);
+    background: rgba(16, 16, 17, 0.94);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
   }
   .error .pill__body {
     background: rgba(44, 19, 16, 0.95);
