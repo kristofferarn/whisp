@@ -1,3 +1,4 @@
+import { join } from 'node:path'
 import { app, ipcMain } from 'electron'
 import { IPC } from '../shared/ipc'
 import { initDictation, stopDictation } from './dictation'
@@ -5,6 +6,7 @@ import { keyStatus, registerKeyHandlers } from './keystore'
 import { destroyPill } from './pill'
 import { initStore, registerStoreHandlers, setStoreListener } from './store'
 import { initTray } from './tray'
+import { initUpdater } from './updater'
 import { createCaptureWindow, openSettingsWindow, settingsWindow } from './windows'
 
 /**
@@ -16,9 +18,18 @@ import { createCaptureWindow, openSettingsWindow, settingsWindow } from './windo
  * asked — or on first run, when there is no API key and nothing works yet.
  */
 
-// One whisp owns the hotkey. A second launch just surfaces the first one's
-// settings window — the poll isn't an exclusive registration, so two
-// instances would both fire on every press and paste everything twice.
+// Dev and installed builds keep separate worlds: settings, key, history —
+// and, critically, the single-instance lock, which is scoped to userData.
+// Without this split a dev run can't even start while the installed app is
+// running; with it they coexist (mute one from its tray, the hotkey poll
+// isn't exclusive). Must happen before the lock is requested.
+if (!app.isPackaged) {
+  app.setPath('userData', join(app.getPath('appData'), 'whisp-dev'))
+}
+
+// One whisp per world owns its lock. A second launch just surfaces the
+// first one's settings window — two instances in the same world would both
+// fire on every press and paste everything twice.
 const gotLock = app.requestSingleInstanceLock()
 if (!gotLock) {
   app.quit()
@@ -39,6 +50,7 @@ if (!gotLock) {
     const capture = createCaptureWindow()
     initDictation(ipcMain, capture.webContents)
     initTray(() => openSettingsWindow())
+    initUpdater()
 
     // First run: no key means nothing works — open the one place to fix it.
     const status = await keyStatus()

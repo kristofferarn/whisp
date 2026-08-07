@@ -1,0 +1,43 @@
+# Packaging — the installed build. `npm run package` locally,
+# .github/workflows/release.yml on every v* tag. electron-updater reads the
+# publish block from here (baked into app-update.yml) to know where releases
+# live; the repo is public, so installed apps poll releases with no token.
+appId: com.kristofferarn.whisp
+productName: whisp
+directories:
+  buildResources: resources
+  output: release
+files:
+  - out/**
+  # ?asset imports (tray icons, whisp.ico) are not copied into out/ —
+  # electron-vite resolves them as __dirname-relative paths into resources/,
+  # so the folder must ship alongside out/ in the asar or every one of them
+  # silently resolves to an empty image.
+  - resources/**
+  # Icon masters are gen-icons.cjs inputs, not runtime assets (the UI's copy
+  # is bundled by Vite) — dead weight in the installer.
+  - '!resources/logo.png'
+  - '!resources/logo-128.png'
+# koffi ships N-API prebuilds and there is deliberately no native toolchain
+# step — a rebuild here would reintroduce exactly what the prebuilds avoid.
+npmRebuild: false
+asarUnpack:
+  # Native .node binaries can't load from inside the asar.
+  - node_modules/koffi/**
+win:
+  icon: resources/whisp.ico
+  target: nsis
+nsis:
+  # Per-user one-click install: no admin prompt, %LOCALAPPDATA%, and the
+  # silent swap electron-updater's quitAndInstall relies on.
+  oneClick: true
+  shortcutName: whisp
+  artifactName: whisp-Setup-${version}.${ext}
+publish:
+  provider: github
+  owner: kristofferarn
+  repo: whisp
+  # Publish outright, not as a draft — the updater can't see drafts. The
+  # release workflow still stages everything in a draft it publishes at the
+  # end; this setting only matters for what electron-builder would create.
+  releaseType: release

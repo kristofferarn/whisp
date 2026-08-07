@@ -12,9 +12,11 @@
     "typecheck": "tsc --noEmit",
     "start": "electron-vite preview",
     "smoke:ffi": "electron ./scripts/ffi-smoke.cjs",
-    "gen:icons": "node ./scripts/gen-icons.cjs"
+    "gen:icons": "node ./scripts/gen-icons.cjs",
+    "package": "npm run build && electron-builder --win"
   },
   "dependencies": {
+    "electron-updater": "^6.8.9",
     "koffi": "^3.1.4"
   },
   "devDependencies": {
@@ -23,6 +25,7 @@
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^5.2.0",
     "electron": "^43.3.0",
+    "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

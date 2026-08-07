@@ -1,0 +1,84 @@
+# Releasing whisp: bump "version" in package.json, commit, then
+#   git tag v<version> && git push --tags
+# This builds the NSIS installer and publishes it as a GitHub release, which
+# every installed instance picks up on its next update check.
+#
+# The draft-first dance is inherited from SPCE's pipeline, where it was paid
+# for in broken releases: electron-builder creates the release lazily on
+# first asset upload, and the installer and blockmap artifacts race that
+# get-or-create from separate publisher instances — one tag once shipped as
+# two releases, and the updater's /releases/latest found the blockmap-only
+# twin. A draft created up front turns every racer into find-and-reuse,
+# keeps the release invisible to updaters until every asset is attached,
+# and makes a failed run rerunnable.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+# Two runs for one tag would re-race the release creation at the workflow
+# level — the same check-then-create hole this file exists to close.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Create draft release
+        run: gh release view $env:GITHUB_REF_NAME || gh release create $env:GITHUB_REF_NAME --draft --verify-tag --title ($env:GITHUB_REF_NAME -replace '^v', '') --notes ""
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # If twins somehow exist already, stop before electron-builder uploads
+      # into whichever one it happens to list first. And a release that is
+      # already published is final — a rerun must not replace shipped bytes;
+      # fixes get a new version.
+      - name: Refuse duplicates and republishing
+        run: |
+          # The list endpoint lags a just-created release — poll until it shows.
+          $deadline = (Get-Date).AddSeconds(60)
+          do {
+            $releases = gh api "repos/$env:GITHUB_REPOSITORY/releases" --paginate --slurp | ConvertFrom-Json | ForEach-Object { $_ }
+            $mine = @($releases | Where-Object { $_.tag_name -eq $env:GITHUB_REF_NAME })
+            if ($mine.Count -ge 1) { break }
+            Start-Sleep -Seconds 3
+          } while ((Get-Date) -lt $deadline)
+          if ($mine.Count -ne 1) { throw "Expected 1 release for $env:GITHUB_REF_NAME before upload, found $($mine.Count)" }
+          if (-not $mine[0].draft) { throw "$env:GITHUB_REF_NAME is already published; bump the version instead of rerunning" }
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - run: npx electron-builder --win --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Checked while still a draft, so an incomplete release never goes public.
+      - name: Verify the draft is complete
+        run: |
+          $releases = gh api "repos/$env:GITHUB_REPOSITORY/releases" --paginate --slurp | ConvertFrom-Json | ForEach-Object { $_ }
+          $mine = @($releases | Where-Object { $_.tag_name -eq $env:GITHUB_REF_NAME })
+          if ($mine.Count -ne 1) { throw "Expected 1 release for $env:GITHUB_REF_NAME, found $($mine.Count)" }
+          $names = @($mine[0].assets | ForEach-Object { $_.name })
+          $version = $env:GITHUB_REF_NAME -replace '^v', ''
+          foreach ($required in @('latest.yml', "whisp-Setup-$version.exe", "whisp-Setup-$version.exe.blockmap")) {
+            if ($names -notcontains $required) { throw "Release is missing $required (has: $($names -join ', '))" }
+          }
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # electron-builder never publishes a pre-existing draft; this is the
+      # one place the release actually goes live — after every asset above
+      # is verified attached.
+      - name: Publish the release
+        run: gh release edit $env:GITHUB_REF_NAME --draft=false
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

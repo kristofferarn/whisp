@@ -32,11 +32,26 @@ npm run gen:icons  # derive tray icons + whisp.ico from resources/logo.png
 ```
 
 The OpenAI API key is entered in Settings (opens automatically on first run)
-and stored DPAPI-encrypted in `%APPDATA%/whisp`.
+and stored DPAPI-encrypted in `%APPDATA%/whisp` (`%APPDATA%/whisp-dev` for
+dev runs — the two worlds share nothing, including the single-instance lock).
+
+## Releasing
+
+Bump `version` in package.json, commit, then:
+
+```
+git tag v<version> && git push --tags
+```
+
+The Release workflow builds the NSIS installer on windows-latest and
+publishes it as a GitHub release (draft-first, so updaters never see a
+half-uploaded release). Installed apps check for updates on launch and
+every 6 hours; an update installs from the tray's "Restart to update"
+item, or silently on next quit. `npm run package` builds the installer
+locally into `release/` without publishing.
 
 ## Notes
 
-- Two dictation hosts (e.g. whisp plus an SPCE build still running Whisper)
-  both fire on the same press — mute one from its tray.
-- Packaging (electron-builder) is not set up yet; when it is, koffi needs
-  `asarUnpack: node_modules/koffi/**`.
+- Two dictation hosts (e.g. whisp plus an SPCE build still running Whisper,
+  or whisp-dev next to installed whisp) both fire on the same press — mute
+  one from its tray.
