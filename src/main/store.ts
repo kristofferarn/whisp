@@ -4,11 +4,14 @@ import { join } from 'node:path'
 import { app, type IpcMain } from 'electron'
 import {
   DEFAULT_SETTINGS,
+  DICTATION_LANGUAGES,
   IPC,
-  TRANSCRIBE_USD_PER_SECOND,
+  TRANSCRIBE_MODELS,
   type DayStats,
+  type DictationLanguage,
   type HistoryEntry,
   type Stats,
+  type TranscribeModel,
   type WhispSettings
 } from '../shared/ipc'
 
@@ -32,7 +35,6 @@ const EMPTY_STATS: Stats = {
   totalTakes: 0,
   totalSeconds: 0,
   totalWords: 0,
-  totalCostUsd: 0,
   days: {}
 }
 
@@ -78,6 +80,8 @@ function changed(): void {
 
 export function initStore(): void {
   settings = loadJson('settings.json', DEFAULT_SETTINGS)
+  settings.languages = sanitizeLanguages(settings.languages, DEFAULT_SETTINGS.languages)
+  settings.model = sanitizeModel(settings.model, DEFAULT_SETTINGS.model)
   // History loads as a bare array, not an object merge.
   try {
     const parsed = JSON.parse(readFileSync(filePath('history.json'), 'utf8')) as unknown
@@ -119,11 +123,30 @@ function sanitizeDictionary(words: unknown): string[] {
   return clean.slice(0, 100)
 }
 
+/**
+ * Only known codes survive, in canonical order and deduped — anything else
+ * (a hand-edited file, an old build's value) drops out rather than ride
+ * every request until the API rejects it.
+ */
+function sanitizeLanguages(codes: unknown, fallback: DictationLanguage[]): DictationLanguage[] {
+  if (!Array.isArray(codes)) return fallback
+  return DICTATION_LANGUAGES.map((l) => l.code).filter((code) => codes.includes(code))
+}
+
+function sanitizeModel(id: unknown, fallback: TranscribeModel): TranscribeModel {
+  return TRANSCRIBE_MODELS.some((m) => m.id === id) ? (id as TranscribeModel) : fallback
+}
+
 export function setSettings(patch: Partial<WhispSettings>): WhispSettings {
   settings = {
     ...settings,
     ...patch,
-    dictionary: patch.dictionary !== undefined ? sanitizeDictionary(patch.dictionary) : settings.dictionary
+    dictionary: patch.dictionary !== undefined ? sanitizeDictionary(patch.dictionary) : settings.dictionary,
+    languages:
+      patch.languages !== undefined
+        ? sanitizeLanguages(patch.languages, settings.languages)
+        : settings.languages,
+    model: patch.model !== undefined ? sanitizeModel(patch.model, settings.model) : settings.model
   }
   if (!settings.keepHistory && history.length > 0) {
     // Turning history off is a statement of intent about the past too.
@@ -167,7 +190,6 @@ export function recordTake(text: string, seconds: number): void {
   stats.totalTakes += 1
   stats.totalSeconds += seconds
   stats.totalWords += words
-  stats.totalCostUsd += seconds * TRANSCRIBE_USD_PER_SECOND
 
   const key = localDayKey(now)
   const day: DayStats = stats.days[key] ?? { takes: 0, seconds: 0, words: 0 }

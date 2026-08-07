@@ -15,7 +15,8 @@ into a standalone tray app.
 - **Capture** — a hidden renderer window records with
   `getUserMedia`/`MediaRecorder` (webm/opus) and gates out silent takes.
 - **Transcription** — OpenAI `POST /v1/audio/transcriptions` with
-  `gpt-4o-mini-transcribe` (~$0.003/min), biased by your Dictionary words.
+  `gpt-4o-mini-transcribe` or `gpt-transcribe` (a Settings knob), biased by
+  your Dictionary words and hinted with your spoken languages.
 - **Paste** — clipboard-carried: snapshot, `Ctrl+V` via `SendInput`, restore.
 - **UI** — a floating pill while dictating; a tray icon always; a settings
   window (key, dictionary, history, stats) on demand.

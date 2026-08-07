@@ -1,10 +1,5 @@
 import { clipboard, type IpcMain, type WebContents } from 'electron'
-import {
-  IPC,
-  TRANSCRIBE_MODEL,
-  type DictationRecordEvent,
-  type DictationTranscribeResult
-} from '../shared/ipc'
+import { IPC, type DictationRecordEvent, type DictationTranscribeResult } from '../shared/ipc'
 import { resolveKey } from './keystore'
 import { getSettings, recordTake } from './store'
 import { setTrayRecording } from './tray'
@@ -339,11 +334,23 @@ async function transcribe(audio: Uint8Array, mime: string): Promise<string> {
   if (!key) throw new Error('no API key — open Settings from the whisp tray icon')
 
   const prompt = vocabPrompt()
+  const { model, languages } = getSettings()
   const form = new FormData()
   const ext = mime.includes('ogg') ? 'ogg' : 'webm'
   form.append('file', new Blob([Buffer.from(audio)], { type: mime }), `dictation.${ext}`)
-  form.append('model', TRANSCRIBE_MODEL)
+  form.append('model', model)
   if (prompt) form.append('prompt', prompt)
+  // The spoken-languages hint from Settings — a few seconds of a short take
+  // gives free detection little to go on, and Norwegian misheard as Swedish
+  // pastes garbage. gpt-transcribe takes the whole set (repeated `languages[]`
+  // fields, OpenAI's multipart array convention) and detects within it; the
+  // mini model's API fits a single code, so it's hinted only when exactly one
+  // language is selected and detects freely otherwise.
+  if (model === 'gpt-transcribe') {
+    for (const code of languages) form.append('languages[]', code)
+  } else if (languages.length === 1) {
+    form.append('language', languages[0])
+  }
   form.append('response_format', 'json')
 
   const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
@@ -398,8 +405,7 @@ async function onAudio(
     const text =
       audio.byteLength < 2000 ? '' : await cleanupTranscript(await transcribe(audio, mime))
     settleTake(take, text)
-    // The bookkeeping: history and stats, duration-priced — the honest
-    // measure the REST response doesn't carry.
+    // The bookkeeping: history and stats.
     if (text) recordTake(text, Number.isFinite(seconds) && seconds > 0 ? seconds : 0)
     return { ok: true, text }
   } catch (err) {

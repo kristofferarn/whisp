@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { HistoryEntry, KeyStatus, Stats, WhispSettings } from '../../../shared/ipc'
+import {
+  DICTATION_LANGUAGES,
+  TRANSCRIBE_MODELS,
+  type DictationLanguage,
+  type HistoryEntry,
+  type KeyStatus,
+  type Stats,
+  type WhispSettings
+} from '../../../shared/ipc'
 import logoUrl from '../../../../resources/logo-128.png'
 
 /**
@@ -131,8 +139,8 @@ function General({ data, refresh }: { data: Data; refresh: () => void }): React.
       <div className="card">
         <h2 className="eyebrow">OpenAI API key</h2>
         <p className="muted">
-          Dictation transcribes over the OpenAI API (gpt-4o-mini-transcribe, ~$0.003 per minute of
-          speech). The key is stored encrypted on this machine and never leaves the main process.
+          Dictation transcribes over the OpenAI API. The key is stored encrypted on this machine
+          and never leaves the main process.
         </p>
         <div className="row">
           <input
@@ -162,6 +170,53 @@ function General({ data, refresh }: { data: Data; refresh: () => void }): React.
       </div>
 
       <div className="card">
+        <h2 className="eyebrow">Model</h2>
+        <p className="muted">
+          gpt-4o-mini is the budget pick (~$0.003/min) but its API takes at most one language
+          hint. gpt-transcribe (~$0.0045/min) accepts the whole set of spoken languages, so a
+          Norwegian take can't come back as Swedish.
+        </p>
+        <div className="seg" role="radiogroup" aria-label="Transcription model">
+          {TRANSCRIBE_MODELS.map((m) => (
+            <button
+              key={m.id}
+              role="radio"
+              aria-checked={settings.model === m.id}
+              className={`seg__option${settings.model === m.id ? ' seg__option--active' : ''}`}
+              onClick={() => void window.whisp.settings.set({ model: m.id })}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="card">
+        <h2 className="eyebrow">Spoken languages</h2>
+        <p className="muted">
+          The languages you actually dictate in, hinted to the transcriber so it picks within
+          this set instead of guessing among a hundred neighbors.
+        </p>
+        <div className="seg" aria-label="Spoken languages">
+          {DICTATION_LANGUAGES.map((lang) => {
+            const on = settings.languages.includes(lang.code)
+            return (
+              <button
+                key={lang.code}
+                role="checkbox"
+                aria-checked={on}
+                className={`seg__option${on ? ' seg__option--active' : ''}`}
+                onClick={() => toggleLanguage(settings, lang.code)}
+              >
+                {lang.label}
+              </button>
+            )
+          })}
+        </div>
+        <p className="muted hint-line">{languageHint(settings)}</p>
+      </div>
+
+      <div className="card">
         <h2 className="eyebrow">Behavior</h2>
         <Toggle
           label="Mic-ready tick"
@@ -178,6 +233,30 @@ function General({ data, refresh }: { data: Data; refresh: () => void }): React.
       </div>
     </section>
   )
+}
+
+function toggleLanguage(settings: WhispSettings, code: DictationLanguage): void {
+  const next = settings.languages.includes(code)
+    ? settings.languages.filter((c) => c !== code)
+    : [...settings.languages, code]
+  void window.whisp.settings.set({ languages: next })
+}
+
+/**
+ * What the current model + selection actually sends — the mini model's
+ * one-hint limit is the kind of surprise worth spelling out where the
+ * choice is made.
+ */
+function languageHint(settings: WhispSettings): string {
+  const labels = DICTATION_LANGUAGES.filter((l) => settings.languages.includes(l.code)).map(
+    (l) => l.label
+  )
+  if (labels.length === 0) return 'Nothing selected — the transcriber detects freely.'
+  if (settings.model === 'gpt-transcribe') {
+    return `Hinting ${labels.join(' and ')} with every request.`
+  }
+  if (labels.length === 1) return `Hinting ${labels[0]} with every request.`
+  return 'gpt-4o-mini fits only a single hint — with several selected it detects freely. Switch to gpt-transcribe to send the whole set.'
 }
 
 function Toggle({
@@ -318,17 +397,9 @@ function History({ data }: { data: Data }): React.JSX.Element {
 
 /* Stats ------------------------------------------------------------------ */
 
-const USD_PER_SECOND = 0.003 / 60
-
 function localDayKey(date: Date): string {
   const pad = (n: number): string => String(n).padStart(2, '0')
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
-}
-
-function formatUsd(usd: number): string {
-  const dollars = usd.toFixed(2)
-  if (usd > 0 && dollars === '0.00') return '<$0.01'
-  return `$${dollars}`
 }
 
 function sumDays(stats: Stats, dayKeys: string[]): { takes: number; seconds: number; words: number } {
@@ -356,14 +427,13 @@ function StatsTab({ stats }: { stats: Stats }): React.JSX.Element {
   const today = sumDays(stats, [todayKey])
   const week = sumDays(stats, weekKeys)
   const cards = [
-    { title: 'Today', ...today, cost: today.seconds * USD_PER_SECOND },
-    { title: 'Last 7 days', ...week, cost: week.seconds * USD_PER_SECOND },
+    { title: 'Today', ...today },
+    { title: 'Last 7 days', ...week },
     {
       title: 'All time',
       takes: stats.totalTakes,
       seconds: stats.totalSeconds,
-      words: stats.totalWords,
-      cost: stats.totalCostUsd
+      words: stats.totalWords
     }
   ]
 
@@ -387,18 +457,11 @@ function StatsTab({ stats }: { stats: Stats }): React.JSX.Element {
                 <dt>Words</dt>
                 <dd>{card.words}</dd>
               </div>
-              <div>
-                <dt>Est. cost</dt>
-                <dd>{card.cost === 0 ? '$0.00' : formatUsd(card.cost)}</dd>
-              </div>
             </dl>
           </div>
         ))}
       </div>
-      <p className="muted">
-        Priced by recorded duration at gpt-4o-mini-transcribe's ~$0.003/minute — an estimate, not a
-        bill.
-      </p>
+      <p className="muted">Cost lives on the OpenAI usage dashboard — whisp only counts words.</p>
     </section>
   )
 }

@@ -45,12 +45,46 @@ export type DictationTranscribeResult =
   | { ok: true; text: string }
   | { ok: false; error: string }
 
+/**
+ * The transcription models whisp can drive, both on the same REST endpoint.
+ * The mini model is the cheap default (~$0.003/min vs ~$0.0045) but its API
+ * takes at most ONE language hint; gpt-transcribe takes the whole set of
+ * expected languages — the cure for Norwegian coming back as Swedish.
+ * Costs live on the OpenAI dashboard, not here.
+ */
+export const TRANSCRIBE_MODELS = [
+  { id: 'gpt-4o-mini-transcribe', label: 'gpt-4o-mini' },
+  { id: 'gpt-transcribe', label: 'gpt-transcribe' }
+] as const
+
+export type TranscribeModel = (typeof TRANSCRIBE_MODELS)[number]['id']
+
+/**
+ * The languages whisp's human actually speaks — the pool the transcriber
+ * should pick from instead of guessing among ~100 neighbors. ISO-639-1;
+ * 'no' covers Bokmål and Nynorsk both. Add a language by adding a row.
+ */
+export const DICTATION_LANGUAGES = [
+  { code: 'en', label: 'English' },
+  { code: 'no', label: 'Norwegian' }
+] as const
+
+export type DictationLanguage = (typeof DICTATION_LANGUAGES)[number]['code']
+
 export interface WhispSettings {
   /**
    * Vocabulary bias for the transcriber — names and jargon it would
    * otherwise mishear. Joined into the transcription request's prompt.
    */
   dictionary: string[]
+  /** Which transcription model requests use (a Settings knob, price vs. accuracy). */
+  model: TranscribeModel
+  /**
+   * Spoken languages, hinted with every request. gpt-transcribe takes the
+   * whole set; the mini model's API fits one code, so it's hinted only when
+   * exactly one is selected. Empty (or several, on mini) detects freely.
+   */
+  languages: DictationLanguage[]
   /** The near-subliminal tick when the mic actually opens. */
   chime: boolean
   /** Keep a local log of transcripts (History tab). Stats accrue regardless. */
@@ -61,6 +95,8 @@ export interface WhispSettings {
 
 export const DEFAULT_SETTINGS: WhispSettings = {
   dictionary: [],
+  model: 'gpt-4o-mini-transcribe',
+  languages: ['en', 'no'],
   chime: true,
   keepHistory: true,
   launchAtLogin: false
@@ -75,7 +111,7 @@ export interface HistoryEntry {
   /** Unix ms when the take resolved. */
   ts: number
   text: string
-  /** Recorded duration in seconds — what the transcription billed. */
+  /** Recorded duration in seconds. */
   seconds: number
 }
 
@@ -89,14 +125,9 @@ export interface Stats {
   totalTakes: number
   totalSeconds: number
   totalWords: number
-  totalCostUsd: number
   /** Per-day buckets keyed YYYY-MM-DD (local time), pruned to recent days. */
   days: Record<string, DayStats>
 }
-
-export const TRANSCRIBE_MODEL = 'gpt-4o-mini-transcribe'
-/** gpt-4o-mini-transcribe bills ~$0.003 per minute of audio. */
-export const TRANSCRIBE_USD_PER_SECOND = 0.003 / 60
 
 /**
  * The preload bridge, `window.whisp`. One bridge serves both windows: the

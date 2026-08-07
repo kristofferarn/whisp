@@ -177,8 +177,7 @@ async function stopRecording(id: number): Promise<void> {
       take.voicedFrames >= MIN_VOICED_FRAMES
         ? new Uint8Array(await blob.arrayBuffer())
         : new Uint8Array()
-    // Duration rides along: it is what the transcription bills, and main's
-    // history/stats price takes by it.
+    // Duration rides along for main's history and stats.
     await window.whisp.dictation.transcribe(audio, blob.type, id, durationS)
   } catch {
     // Main's watchdog forgets the take if this answer never arrives; the
