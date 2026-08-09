@@ -91,6 +91,8 @@ export function App(): React.JSX.Element {
           Hold <kbd>Ctrl</kbd>+<kbd>Win</kbd> anywhere.
           <br />
           Speak. Release.
+          <br />
+          Double-tap to stay listening.
         </div>
       </nav>
       <main className="content">
@@ -218,6 +220,12 @@ function General({ data, refresh }: { data: Data; refresh: () => void }): React.
 
       <div className="card">
         <h2 className="eyebrow">Behavior</h2>
+        <Toggle
+          label="Hands-free double-tap"
+          hint="Tap Ctrl+Win twice quickly and whisp keeps listening with the keys released — talk while you read something else, then tap once more with the target focused to paste there. Stops on its own after 5 minutes."
+          checked={settings.handsFree}
+          onChange={(v) => void window.whisp.settings.set({ handsFree: v })}
+        />
         <Toggle
           label="Mic-ready tick"
           hint="A near-subliminal chirp when the microphone is actually capturing — anything said before it plays is lost."

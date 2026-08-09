@@ -4,6 +4,10 @@ System-wide push-to-talk dictation for Windows. Hold **Ctrl+Win** anywhere,
 speak, release — the transcript is pasted into whatever has focus. Never
 submitted: pressing Enter stays your job.
 
+Or **double-tap Ctrl+Win** to go hands-free: whisp keeps listening with
+nothing held down, so you can look things up mid-sentence. Tap once more —
+with the input you want focused — and the transcript lands there.
+
 Extracted from [SPCE](https://github.com/kristofferarn)'s "Whisper" feature
 into a standalone tray app.
 
@@ -11,7 +15,9 @@ into a standalone tray app.
 
 - **Hotkey** — a 50ms `GetAsyncKeyState` poll via [koffi](https://koffi.dev)
   FFI (Electron's `globalShortcut` has no keyup, so a modifier-only hold is
-  inexpressible there).
+  inexpressible there). Presses shorter than 300ms keep the mic open for a
+  400ms window in case a second tap arrives; two taps latch the take into a
+  hands-free session, capped at 5 minutes.
 - **Capture** — a hidden renderer window records with
   `getUserMedia`/`MediaRecorder` (webm/opus) and gates out silent takes.
 - **Transcription** — OpenAI `POST /v1/audio/transcriptions` with

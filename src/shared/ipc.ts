@@ -85,6 +85,13 @@ export interface WhispSettings {
    * exactly one is selected. Empty (or several, on mini) detects freely.
    */
   languages: DictationLanguage[]
+  /**
+   * The double-tap gesture: tapping Ctrl+Win twice quickly latches the take
+   * into a hands-free session that records with nothing held, until the next
+   * tap. Off restores pure push-to-talk — every release ends its take
+   * immediately, with no window spent waiting for a second tap.
+   */
+  handsFree: boolean
   /** The near-subliminal tick when the mic actually opens. */
   chime: boolean
   /** Keep a local log of transcripts (History tab). Stats accrue regardless. */
@@ -97,6 +104,7 @@ export const DEFAULT_SETTINGS: WhispSettings = {
   dictionary: [],
   model: 'gpt-4o-mini-transcribe',
   languages: ['en', 'no'],
+  handsFree: true,
   chime: true,
   keepHistory: true,
   launchAtLogin: false

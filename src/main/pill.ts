@@ -50,7 +50,14 @@ const PAGE = `<!doctype html>
   #bars i { width: 3.5px; height: 4px; border-radius: 2px; background: #a9ece5;
             transition: height 70ms linear; }
   .recording #label { display: none; }
-  .recording #bars { display: flex; }
+  .recording #bars, .handsFree #bars { display: flex; }
+  /* Hands-free is the one state that outlives the gesture that started it,
+     so it's the one state that says its own name — and tints the lozenge
+     teal, the app's "something is live here" color, since this pill may sit
+     in the corner of your eye for minutes while you read something else.
+     The wave keeps its place beside the wisp; the word goes last. */
+  .handsFree #label { order: 1; color: #8fe9de; }
+  .handsFree .pill__body { border-color: rgba(69, 224, 210, 0.32); }
 </style></head>
 <body>
   <div id="pill" class="pill recording"><div class="pill__body">
@@ -77,12 +84,13 @@ const PAGE = `<!doctype html>
     var energy = 0   /* smoothed toward target — swells fast, settles soft */
     var t = 0
 
+    function live(m) { return m === 'recording' || m === 'handsFree' }
     function setState(m, message) {
       mode = m
       document.getElementById('pill').className = 'pill ' + m
       document.getElementById('label').textContent =
-        message || (m === 'recording' ? 'Listening' : 'Transcribing')
-      if (m !== 'recording') { target = 0; levels([0, 0, 0, 0, 0]) }
+        message || (m === 'handsFree' ? 'Hands-free' : m === 'recording' ? 'Listening' : 'Transcribing')
+      if (!live(m)) { target = 0; levels([0, 0, 0, 0, 0]) }
     }
     function levels(bands) {
       var peak = 0
@@ -164,7 +172,10 @@ export function initPill(): void {
   ensure()
 }
 
-function drive(mode: 'recording' | 'transcribing' | 'error', message?: string): void {
+/** Recording, latched hands-free, transcribing — or the one lingering state. */
+export type PillMode = 'recording' | 'handsFree' | 'transcribing'
+
+function drive(mode: PillMode | 'error', message?: string): void {
   const win = ensure()
   wantedJs = `setState(${JSON.stringify(mode)}, ${JSON.stringify(message ?? '')})`
   if (pageReady) void win.webContents.executeJavaScript(wantedJs).catch(() => undefined)
@@ -172,7 +183,9 @@ function drive(mode: 'recording' | 'transcribing' | 'error', message?: string): 
   // follows the pointer, which is the best available guess at where the
   // human is looking. Re-placed at the start of every take, not only on
   // show: consecutive takes can keep the pill visible across a change of
-  // monitor, and it should follow.
+  // monitor, and it should follow. Latching is the exception: a hands-free
+  // session is exactly when the pointer wanders, and a pill that chased it
+  // would be the one thing in the room that moves while you read.
   if (!win.isVisible() || mode === 'recording') {
     const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint())
     const { x, y, width, height } = display.workArea
@@ -186,7 +199,7 @@ function drive(mode: 'recording' | 'transcribing' | 'error', message?: string): 
   if (!win.isVisible()) win.showInactive()
 }
 
-export function showPill(mode: 'recording' | 'transcribing'): void {
+export function showPill(mode: PillMode): void {
   drive(mode)
 }
 
