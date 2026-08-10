@@ -1,6 +1,6 @@
 {
   "name": "whisp",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "System-wide push-to-talk dictation for Windows — hold Ctrl+Win, speak, release",
   "author": "Kristoffer Arntzen",
   "main": "./out/main/index.js",

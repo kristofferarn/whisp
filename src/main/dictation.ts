@@ -507,7 +507,9 @@ async function flushInjects(): Promise<void> {
 function transcribeBudgetMs(seconds: number): number {
   const capSeconds = HANDS_FREE_MAX_MS / 1000
   const clamped = Number.isFinite(seconds) ? Math.min(Math.max(seconds, 0), capSeconds) : 0
-  return 30_000 + clamped * 250
+  // Rounded because AbortSignal.timeout rejects a fractional delay outright,
+  // and a take's duration is fractional seconds nearly every time.
+  return Math.round(30_000 + clamped * 250)
 }
 
 async function transcribe(audio: Uint8Array, mime: string, seconds: number): Promise<string> {
