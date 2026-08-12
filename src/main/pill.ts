@@ -197,6 +197,23 @@ function drive(mode: PillMode | 'error', message?: string): void {
     })
   }
   if (!win.isVisible()) win.showInactive()
+  raise(win)
+}
+
+/**
+ * Windows strips WS_EX_TOPMOST out from under us — another app going
+ * exclusive-fullscreen, a UAC secure desktop, lock/unlock, RDP, an explorer
+ * restart — and never gives it back. The pill's window outlives all of those,
+ * and showInactive() is SW_SHOWNOACTIVATE, which keeps its z-order rather than
+ * raising it, so a single assert at creation meant one demotion hid the pill
+ * behind ordinary windows until whisp was restarted. Re-assert every take:
+ * off-then-on, because setting a flag Electron already believes is set can
+ * no-op before it reaches SetWindowPos.
+ */
+function raise(win: BrowserWindow): void {
+  win.setAlwaysOnTop(false)
+  win.setAlwaysOnTop(true, 'screen-saver')
+  win.moveTop()
 }
 
 export function showPill(mode: PillMode): void {
