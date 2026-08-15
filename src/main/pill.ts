@@ -47,17 +47,15 @@ const PAGE = `<!doctype html>
   /* The wave: live mic levels while recording — proof the mic hears you,
      where a static "Listening" only claims it. */
   #bars { display: none; align-items: center; gap: 3.5px; height: 20px; }
-  #bars i { width: 3.5px; height: 4px; border-radius: 2px; background: #a9ece5;
+  #bars i { width: 3.5px; height: 4px; border-radius: 2px; background: #e3e5e8;
             transition: height 70ms linear; }
   .recording #label { display: none; }
   .recording #bars, .handsFree #bars { display: flex; }
   /* Hands-free is the one state that outlives the gesture that started it,
-     so it's the one state that says its own name — and tints the lozenge
-     teal, the app's "something is live here" color, since this pill may sit
-     in the corner of your eye for minutes while you read something else.
-     The wave keeps its place beside the wisp; the word goes last. */
-  .handsFree #label { order: 1; color: #8fe9de; }
-  .handsFree .pill__body { border-color: rgba(69, 224, 210, 0.32); }
+     so it's the one state that says its own name and brightens the lozenge.
+     The wave keeps its place beside the mark; the word goes last. */
+  .handsFree #label { order: 1; color: #f4f5f7; }
+  .handsFree .pill__body { border-color: rgba(255, 255, 255, 0.28); }
 </style></head>
 <body>
   <div id="pill" class="pill recording"><div class="pill__body">
@@ -65,7 +63,7 @@ const PAGE = `<!doctype html>
     <span id="bars"><i></i><i></i><i></i><i></i><i></i></span>
   </div></div>
   <script>
-    /* The dot is a wisp: a glowing teal core whose halo swells with the
+    /* The dot echoes the icon's white signal: its halo swells with the
        voice and breathes softly through silence — alive the whole take,
        never mechanical. Transcribing keeps the slow breath with no voice
        in it; an error dims it to a gray standstill. The bars carry the
@@ -118,9 +116,9 @@ const PAGE = `<!doctype html>
         g.addColorStop(0.4, 'rgba(150, 158, 157, 0.25)')
         g.addColorStop(1, 'rgba(150, 158, 157, 0)')
       } else {
-        g.addColorStop(0, 'rgba(216, 255, 249, 0.95)')
-        g.addColorStop(0.28, 'rgba(69, 224, 210, ' + glow + ')')
-        g.addColorStop(1, 'rgba(69, 224, 210, 0)')
+        g.addColorStop(0, 'rgba(255, 255, 255, 0.98)')
+        g.addColorStop(0.28, 'rgba(222, 225, 230, ' + glow + ')')
+        g.addColorStop(1, 'rgba(222, 225, 230, 0)')
       }
       ctx.fillStyle = g
       ctx.beginPath()

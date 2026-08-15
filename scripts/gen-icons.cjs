@@ -1,6 +1,6 @@
 /**
- * Derives every icon whisp ships from one master: resources/logo.png (the
- * wisp mark, 1024px RGBA). Run with: npm run gen:icons. Outputs:
+ * Derives every icon whisp ships from one high-resolution RGBA master:
+ * resources/logo.png. Run with: npm run gen:icons. Outputs:
  *
  *   resources/tray-idle.png       32px, the mark
  *   resources/tray-recording.png  32px, the mark + red badge (bottom-right)
@@ -286,9 +286,8 @@ const resources = join(__dirname, '..', 'resources')
 const logo = decodePng(readFileSync(join(resources, 'logo.png')))
 const mark = cropToContent(logo, 0.08)
 
-// Tray: 32px states. Recording gets a red badge bottom-right — a badge on
-// the colored mark beats tinting it red, which turns teal to mud. A darker
-// rim under the badge separates it from the mark at a glance.
+// Tray: 32px states. Recording gets a red badge bottom-right, with a darker
+// rim underneath to separate it from the mark at a glance.
 const TRAY = 32
 const idle = resize(mark, TRAY, TRAY)
 

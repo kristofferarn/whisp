@@ -7,7 +7,7 @@ import { dictationMuted, setDictationMuted } from './dictation'
  * and, with the red badge, the minimum honest UI: the one place "you are
  * being recorded" always lives.
  *
- * The icons are derived from the wisp mark (resources/logo.png) by
+ * The icons are derived from the brand mark (resources/logo.png) by
  * scripts/gen-icons.cjs: idle is the mark, recording adds the red badge,
  * muted is the mark at 35% — present, deliberately not listening.
  *
