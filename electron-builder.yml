@@ -18,6 +18,11 @@ files:
   # is bundled by Vite) — dead weight in the installer.
   - '!resources/logo.png'
   - '!resources/logo-128.png'
+  - '!resources/audio-control.ps1'
+extraResources:
+  # A child PowerShell process cannot execute a script from inside app.asar.
+  - from: resources/audio-control.ps1
+    to: audio-control.ps1
 # koffi ships N-API prebuilds and there is deliberately no native toolchain
 # step — a rebuild here would reintroduce exactly what the prebuilds avoid.
 npmRebuild: false

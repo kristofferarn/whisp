@@ -1,5 +1,6 @@
 import { clipboard, type IpcMain, type WebContents } from 'electron'
 import { IPC, type DictationRecordEvent, type DictationTranscribeResult } from '../shared/ipc'
+import { beginAudioControl, endAudioControl } from './audio-control'
 import { resolveKey } from './keystore'
 import { getSettings, recordTake } from './store'
 import { setTrayRecording } from './tray'
@@ -283,6 +284,7 @@ function finishTake(take: number): void {
   inFlight.set(take, watchdog)
   owedOrder.push(take)
   sendRecord({ action: 'stop', take })
+  endAudioControl()
   refreshUi()
 }
 
@@ -330,7 +332,8 @@ function pollHotkey(): void {
     // Hold began: record until release.
     beginPress(now, false)
     takeCounter++
-    const { chime, microphoneId } = getSettings()
+    const { audioBehavior, chime, microphoneId } = getSettings()
+    beginAudioControl(audioBehavior)
     sendRecord({ action: 'start', take: takeCounter, chime, microphoneId })
     refreshUi()
   } else if (combo && holding) {
@@ -656,6 +659,7 @@ export function stopDictation(): void {
   latched = false
   tapAt = 0
   swallowing = false
+  endAudioControl()
   for (const watchdog of inFlight.values()) if (watchdog) clearTimeout(watchdog)
   inFlight.clear()
   owedOrder.length = 0

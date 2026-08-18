@@ -4,10 +4,12 @@ import { join } from 'node:path'
 import { app, type IpcMain } from 'electron'
 import {
   DEFAULT_SETTINGS,
+  DICTATION_AUDIO_BEHAVIORS,
   DICTATION_LANGUAGES,
   IPC,
   TRANSCRIBE_MODELS,
   type DayStats,
+  type DictationAudioBehavior,
   type DictationLanguage,
   type HistoryEntry,
   type Stats,
@@ -83,6 +85,10 @@ export function initStore(): void {
   settings.languages = sanitizeLanguages(settings.languages, DEFAULT_SETTINGS.languages)
   settings.model = sanitizeModel(settings.model, DEFAULT_SETTINGS.model)
   settings.microphoneId = sanitizeMicrophoneId(settings.microphoneId)
+  settings.audioBehavior = sanitizeAudioBehavior(
+    settings.audioBehavior,
+    DEFAULT_SETTINGS.audioBehavior
+  )
   // History loads as a bare array, not an object merge.
   try {
     const parsed = JSON.parse(readFileSync(filePath('history.json'), 'utf8')) as unknown
@@ -144,6 +150,15 @@ function sanitizeMicrophoneId(id: unknown): string | null {
   return trimmed ? trimmed.slice(0, 512) : null
 }
 
+function sanitizeAudioBehavior(
+  id: unknown,
+  fallback: DictationAudioBehavior
+): DictationAudioBehavior {
+  return DICTATION_AUDIO_BEHAVIORS.some((behavior) => behavior.id === id)
+    ? (id as DictationAudioBehavior)
+    : fallback
+}
+
 export function setSettings(patch: Partial<WhispSettings>): WhispSettings {
   settings = {
     ...settings,
@@ -157,7 +172,11 @@ export function setSettings(patch: Partial<WhispSettings>): WhispSettings {
     microphoneId:
       patch.microphoneId !== undefined
         ? sanitizeMicrophoneId(patch.microphoneId)
-        : settings.microphoneId
+        : settings.microphoneId,
+    audioBehavior:
+      patch.audioBehavior !== undefined
+        ? sanitizeAudioBehavior(patch.audioBehavior, settings.audioBehavior)
+        : settings.audioBehavior
   }
   if (!settings.keepHistory && history.length > 0) {
     // Turning history off is a statement of intent about the past too.

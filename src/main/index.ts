@@ -1,10 +1,11 @@
 import { join } from 'node:path'
 import { app, ipcMain } from 'electron'
 import { IPC } from '../shared/ipc'
+import { initAudioControl, stopAudioControl } from './audio-control'
 import { initDictation, stopDictation } from './dictation'
 import { keyStatus, registerKeyHandlers } from './keystore'
 import { destroyPill } from './pill'
-import { initStore, registerStoreHandlers, setStoreListener } from './store'
+import { getSettings, initStore, registerStoreHandlers, setStoreListener } from './store'
 import { initTray } from './tray'
 import { initUpdater } from './updater'
 import { createCaptureWindow, openSettingsWindow, settingsWindow } from './windows'
@@ -40,10 +41,12 @@ if (!gotLock) {
 
   app.whenReady().then(async () => {
     initStore()
+    initAudioControl(getSettings().audioBehavior)
     registerKeyHandlers(ipcMain)
     registerStoreHandlers(ipcMain)
     // Anything the settings UI shows changed — tell it, if it's open.
     setStoreListener(() => {
+      initAudioControl(getSettings().audioBehavior)
       settingsWindow()?.webContents.send(IPC.dataChanged)
     })
 
@@ -64,6 +67,7 @@ if (!gotLock) {
 
   app.on('before-quit', () => {
     stopDictation()
+    stopAudioControl()
     destroyPill()
   })
 }

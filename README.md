@@ -20,6 +20,8 @@ into a standalone tray app.
   hands-free session, capped at 5 minutes.
 - **Capture** — a hidden renderer window records with
   `getUserMedia`/`MediaRecorder` (webm/opus) and gates out silent takes.
+- **Playback** — while the microphone is open, optionally lowers Windows
+  output or pauses active media sessions, then restores what whisp changed.
 - **Transcription** — OpenAI `POST /v1/audio/transcriptions` with
   `gpt-4o-mini-transcribe` or `gpt-transcribe` (a Settings knob), biased by
   your Dictionary words and hinted with your spoken languages.

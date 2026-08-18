@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
+  DICTATION_AUDIO_BEHAVIORS,
   DICTATION_LANGUAGES,
   TRANSCRIBE_MODELS,
   type DictationLanguage,
@@ -174,6 +175,26 @@ function General({ data, refresh }: { data: Data; refresh: () => void }): React.
       <MicrophonePicker settings={settings} />
 
       <div className="card">
+        <h2 className="eyebrow">Audio while dictating</h2>
+        <p className="muted">{audioBehaviorHint(settings.audioBehavior)}</p>
+        <div className="seg" role="radiogroup" aria-label="Audio while dictating">
+          {DICTATION_AUDIO_BEHAVIORS.map((behavior) => (
+            <button
+              key={behavior.id}
+              role="radio"
+              aria-checked={settings.audioBehavior === behavior.id}
+              className={`seg__option${
+                settings.audioBehavior === behavior.id ? ' seg__option--active' : ''
+              }`}
+              onClick={() => void window.whisp.settings.set({ audioBehavior: behavior.id })}
+            >
+              {behavior.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="card">
         <h2 className="eyebrow">Model</h2>
         <p className="muted">
           gpt-4o-mini is the budget pick (~$0.003/min) but its API takes at most one language
@@ -243,6 +264,16 @@ function General({ data, refresh }: { data: Data; refresh: () => void }): React.
       </div>
     </section>
   )
+}
+
+function audioBehaviorHint(behavior: WhispSettings['audioBehavior']): string {
+  if (behavior === 'lower') {
+    return 'Reduces Windows output to 15% of its current level, then restores it when listening stops.'
+  }
+  if (behavior === 'pause') {
+    return 'Pauses active Windows media sessions, then resumes only the sessions whisp paused.'
+  }
+  return 'Leaves music, video and other playback unchanged.'
 }
 
 function MicrophonePicker({ settings }: { settings: WhispSettings }): React.JSX.Element {

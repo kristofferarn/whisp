@@ -73,6 +73,14 @@ export const DICTATION_LANGUAGES = [
 
 export type DictationLanguage = (typeof DICTATION_LANGUAGES)[number]['code']
 
+export const DICTATION_AUDIO_BEHAVIORS = [
+  { id: 'lower', label: 'Lower volume' },
+  { id: 'pause', label: 'Pause media' },
+  { id: 'none', label: 'Keep playing' }
+] as const
+
+export type DictationAudioBehavior = (typeof DICTATION_AUDIO_BEHAVIORS)[number]['id']
+
 export interface WhispSettings {
   /**
    * Vocabulary bias for the transcriber — names and jargon it would
@@ -98,6 +106,8 @@ export interface WhispSettings {
   chime: boolean
   /** Input device id, or null to follow the current Windows default microphone. */
   microphoneId: string | null
+  /** What happens to Windows playback while the microphone is open. */
+  audioBehavior: DictationAudioBehavior
   /** Keep a local log of transcripts (History tab). Stats accrue regardless. */
   keepHistory: boolean
   /** Start whisp when Windows starts (applies to the installed build). */
@@ -111,6 +121,7 @@ export const DEFAULT_SETTINGS: WhispSettings = {
   handsFree: true,
   chime: true,
   microphoneId: null,
+  audioBehavior: 'lower',
   keepHistory: true,
   launchAtLogin: false
 }
