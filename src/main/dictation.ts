@@ -330,7 +330,8 @@ function pollHotkey(): void {
     // Hold began: record until release.
     beginPress(now, false)
     takeCounter++
-    sendRecord({ action: 'start', take: takeCounter, chime: getSettings().chime })
+    const { chime, microphoneId } = getSettings()
+    sendRecord({ action: 'start', take: takeCounter, chime, microphoneId })
     refreshUi()
   } else if (combo && holding) {
     if (!chorded && CHORD_KEYS.some(down)) chorded = true

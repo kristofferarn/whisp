@@ -87,7 +87,53 @@ function startMeter(stream: MediaStream, take: Take): () => void {
   }
 }
 
-async function startRecording(id: number, chime: boolean): Promise<void> {
+function unavailableMicrophone(error: unknown): boolean {
+  return (
+    error instanceof DOMException &&
+    (error.name === 'NotFoundError' ||
+      error.name === 'OverconstrainedError' ||
+      error.name === 'NotReadableError' ||
+      error.name === 'AbortError')
+  )
+}
+
+function missingMicrophone(error: unknown): boolean {
+  return (
+    error instanceof DOMException &&
+    (error.name === 'NotFoundError' || error.name === 'OverconstrainedError')
+  )
+}
+
+/**
+ * A saved device is preferred, but never allowed to make dictation inert.
+ * If Windows no longer exposes it, forget the choice and retry through the
+ * system-default path. Other failures, such as denied permission or a busy
+ * device, need to reach the pill instead of being disguised as a fallback.
+ */
+async function openMicrophone(microphoneId: string | null): Promise<MediaStream> {
+  if (!microphoneId) return navigator.mediaDevices.getUserMedia({ audio: true })
+
+  try {
+    return await navigator.mediaDevices.getUserMedia({
+      audio: { deviceId: { exact: microphoneId } }
+    })
+  } catch (error) {
+    if (!unavailableMicrophone(error)) throw error
+    // A missing device is gone from Windows' list, so the saved choice is no
+    // longer useful. Busy/aborted devices can be transient: use the default
+    // for this take without forgetting the preference.
+    if (missingMicrophone(error)) {
+      await window.whisp.settings.set({ microphoneId: null }).catch(() => undefined)
+    }
+    return navigator.mediaDevices.getUserMedia({ audio: true })
+  }
+}
+
+async function startRecording(
+  id: number,
+  chime: boolean,
+  microphoneId: string | null
+): Promise<void> {
   if (takes.has(id)) return
   const take: Take = {
     recorder: null,
@@ -102,7 +148,7 @@ async function startRecording(id: number, chime: boolean): Promise<void> {
 
   let stream: MediaStream | null = null
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    stream = await openMicrophone(microphoneId)
     // A short hold releases before the mic finishes opening; stopRecording
     // already answered main with a silent take, so just let the mic go.
     if (take.stopped) {
@@ -192,6 +238,8 @@ async function stopRecording(id: number): Promise<void> {
 
 // Wire-up: main's orders, for as long as the app lives.
 window.whisp.dictation.onRecord((e) => {
-  if (e.action === 'start') void startRecording(e.take, e.chime !== false)
+  if (e.action === 'start') {
+    void startRecording(e.take, e.chime !== false, e.microphoneId ?? null)
+  }
   else void stopRecording(e.take)
 })

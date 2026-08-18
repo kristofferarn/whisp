@@ -39,6 +39,8 @@ export interface DictationRecordEvent {
   take: number
   /** On 'start': whether to play the mic-ready tick (a settings toggle). */
   chime?: boolean
+  /** On 'start': the chosen input device, or null to follow the Windows default. */
+  microphoneId?: string | null
 }
 
 export type DictationTranscribeResult =
@@ -94,6 +96,8 @@ export interface WhispSettings {
   handsFree: boolean
   /** The near-subliminal tick when the mic actually opens. */
   chime: boolean
+  /** Input device id, or null to follow the current Windows default microphone. */
+  microphoneId: string | null
   /** Keep a local log of transcripts (History tab). Stats accrue regardless. */
   keepHistory: boolean
   /** Start whisp when Windows starts (applies to the installed build). */
@@ -106,6 +110,7 @@ export const DEFAULT_SETTINGS: WhispSettings = {
   languages: ['en', 'no'],
   handsFree: true,
   chime: true,
+  microphoneId: null,
   keepHistory: true,
   launchAtLogin: false
 }

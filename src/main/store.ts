@@ -82,6 +82,7 @@ export function initStore(): void {
   settings = loadJson('settings.json', DEFAULT_SETTINGS)
   settings.languages = sanitizeLanguages(settings.languages, DEFAULT_SETTINGS.languages)
   settings.model = sanitizeModel(settings.model, DEFAULT_SETTINGS.model)
+  settings.microphoneId = sanitizeMicrophoneId(settings.microphoneId)
   // History loads as a bare array, not an object merge.
   try {
     const parsed = JSON.parse(readFileSync(filePath('history.json'), 'utf8')) as unknown
@@ -137,6 +138,12 @@ function sanitizeModel(id: unknown, fallback: TranscribeModel): TranscribeModel 
   return TRANSCRIBE_MODELS.some((m) => m.id === id) ? (id as TranscribeModel) : fallback
 }
 
+function sanitizeMicrophoneId(id: unknown): string | null {
+  if (typeof id !== 'string') return null
+  const trimmed = id.trim()
+  return trimmed ? trimmed.slice(0, 512) : null
+}
+
 export function setSettings(patch: Partial<WhispSettings>): WhispSettings {
   settings = {
     ...settings,
@@ -146,7 +153,11 @@ export function setSettings(patch: Partial<WhispSettings>): WhispSettings {
       patch.languages !== undefined
         ? sanitizeLanguages(patch.languages, settings.languages)
         : settings.languages,
-    model: patch.model !== undefined ? sanitizeModel(patch.model, settings.model) : settings.model
+    model: patch.model !== undefined ? sanitizeModel(patch.model, settings.model) : settings.model,
+    microphoneId:
+      patch.microphoneId !== undefined
+        ? sanitizeMicrophoneId(patch.microphoneId)
+        : settings.microphoneId
   }
   if (!settings.keepHistory && history.length > 0) {
     // Turning history off is a statement of intent about the past too.

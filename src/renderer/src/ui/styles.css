@@ -249,7 +249,8 @@ h1 {
 
 input[type='text'],
 input[type='password'],
-input:not([type]) {
+input:not([type]),
+select {
   flex: 1;
   padding: 8px 11px;
   border: 1px solid var(--edge);
@@ -259,6 +260,14 @@ input:not([type]) {
   font: inherit;
   outline: none;
   transition: border-color 120ms, box-shadow 120ms;
+}
+
+select {
+  width: 100%;
+}
+
+select:disabled {
+  opacity: 0.55;
 }
 
 input.mono {
@@ -271,7 +280,8 @@ input::placeholder {
   opacity: 0.7;
 }
 
-input:focus {
+input:focus,
+select:focus {
   border-color: var(--wisp);
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18), 0 0 14px rgba(255, 255, 255, 0.08);
 }

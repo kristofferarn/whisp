@@ -171,6 +171,8 @@ function General({ data, refresh }: { data: Data; refresh: () => void }): React.
         </p>
       </div>
 
+      <MicrophonePicker settings={settings} />
+
       <div className="card">
         <h2 className="eyebrow">Model</h2>
         <p className="muted">
@@ -240,6 +242,71 @@ function General({ data, refresh }: { data: Data; refresh: () => void }): React.
         />
       </div>
     </section>
+  )
+}
+
+function MicrophonePicker({ settings }: { settings: WhispSettings }): React.JSX.Element {
+  const [microphones, setMicrophones] = useState<MediaDeviceInfo[]>([])
+  const [loaded, setLoaded] = useState(false)
+  const [failed, setFailed] = useState(false)
+
+  const refresh = useCallback(async (): Promise<void> => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices()
+      setMicrophones(
+        devices.filter(
+          (device) =>
+            device.kind === 'audioinput' &&
+            device.deviceId !== 'default' &&
+            device.deviceId !== 'communications'
+        )
+      )
+      setFailed(false)
+    } catch {
+      setFailed(true)
+    } finally {
+      setLoaded(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    void refresh()
+    navigator.mediaDevices.addEventListener('devicechange', refresh)
+    return () => navigator.mediaDevices.removeEventListener('devicechange', refresh)
+  }, [refresh])
+
+  const selectedIsMissing =
+    loaded &&
+    settings.microphoneId !== null &&
+    !microphones.some((device) => device.deviceId === settings.microphoneId)
+
+  return (
+    <div className="card">
+      <h2 className="eyebrow">Microphone</h2>
+      <p className="muted">
+        System default follows the input selected in Windows. A specific microphone is used until
+        it becomes unavailable, then whisp returns to the system default.
+      </p>
+      <select
+        aria-label="Microphone"
+        disabled={!loaded || failed}
+        value={settings.microphoneId ?? ''}
+        onChange={(event) =>
+          void window.whisp.settings.set({ microphoneId: event.target.value || null })
+        }
+      >
+        <option value="">System default</option>
+        {selectedIsMissing && (
+          <option value={settings.microphoneId ?? ''}>Unavailable microphone</option>
+        )}
+        {microphones.map((device, index) => (
+          <option key={device.deviceId} value={device.deviceId}>
+            {device.label || `Microphone ${index + 1}`}
+          </option>
+        ))}
+      </select>
+      {failed && <p className="status status--warn">Microphones could not be listed.</p>}
+    </div>
   )
 }
 
