@@ -80,11 +80,11 @@ export function BreathLine({
         }
         if (pass === 0) {
           ctx.lineWidth = 8
-          ctx.strokeStyle = `rgba(110, 96, 220, ${0.08 + energy * 0.35})`
+          ctx.strokeStyle = `rgba(200, 192, 255, ${0.1 + energy * 0.45})`
         } else {
           ctx.lineWidth = 1.7
           ctx.lineCap = 'round'
-          ctx.strokeStyle = `rgba(30, 27, 68, ${0.7 + energy * 0.3})`
+          ctx.strokeStyle = `rgba(255, 255, 255, ${0.75 + energy * 0.25})`
         }
         ctx.stroke()
       }

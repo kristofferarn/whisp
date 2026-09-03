@@ -23,8 +23,14 @@ export const IPC = {
   historyClear: 'history:clear',
   statsGet: 'stats:get',
   /** Main → settings UI: something it shows (settings/history/stats) changed. */
-  dataChanged: 'data:changed'
+  dataChanged: 'data:changed',
+  /** Settings UI → main: the frameless window's own title-bar buttons. */
+  windowControl: 'window:control',
+  /** Main → settings UI: maximized state changed (the button swaps glyph). */
+  windowMaximized: 'window:maximized'
 } as const
+
+export type WindowControl = 'minimize' | 'maximize' | 'close'
 
 export interface DictationRecordEvent {
   action: 'start' | 'stop'
@@ -194,4 +200,9 @@ export interface WhispApi {
     get: () => Promise<Stats>
   }
   onDataChanged: (listener: () => void) => () => void
+  /** The frameless settings window draws its own title bar; these are its buttons. */
+  window: {
+    control: (action: WindowControl) => void
+    onMaximized: (listener: (maximized: boolean) => void) => () => void
+  }
 }

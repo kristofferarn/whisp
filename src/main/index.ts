@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { app, ipcMain } from 'electron'
+import { app, ipcMain, nativeTheme } from 'electron'
 import { IPC } from '../shared/ipc'
 import { initAudioControl, stopAudioControl } from './audio-control'
 import { initDictation, stopDictation } from './dictation'
@@ -8,7 +8,12 @@ import { destroyPill } from './pill'
 import { getSettings, initStore, registerStoreHandlers, setStoreListener } from './store'
 import { initTray } from './tray'
 import { initUpdater } from './updater'
-import { createCaptureWindow, openSettingsWindow, settingsWindow } from './windows'
+import {
+  createCaptureWindow,
+  openSettingsWindow,
+  registerWindowControls,
+  settingsWindow
+} from './windows'
 
 /**
  * whisp — system-wide push-to-talk dictation for Windows.
@@ -40,10 +45,15 @@ if (!gotLock) {
   })
 
   app.whenReady().then(async () => {
+    // The settings window is dark glass whatever Windows is set to: acrylic
+    // takes its tint from the app theme, and light acrylic under a dark tint
+    // reads as milk, not smoke.
+    nativeTheme.themeSource = 'dark'
     initStore()
     initAudioControl(getSettings().audioBehavior)
     registerKeyHandlers(ipcMain)
     registerStoreHandlers(ipcMain)
+    registerWindowControls(ipcMain)
     // Anything the settings UI shows changed — tell it, if it's open.
     setStoreListener(() => {
       initAudioControl(getSettings().audioBehavior)

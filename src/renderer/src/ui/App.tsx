@@ -9,8 +9,8 @@ import {
   type Stats,
   type WhispSettings
 } from '../../../shared/ipc'
-import logoUrl from '../../../../resources/logo-128.png'
 import { BreathLine } from './BreathLine'
+import { TitleBar } from './TitleBar'
 
 /**
  * The settings window — whisp's whole visible surface, arranged the way the
@@ -19,7 +19,7 @@ import { BreathLine } from './BreathLine'
  * to the voice once the mic closes: key, model, languages, cleanup, the
  * dictionary. History and Stats are the record. All of it re-fetches on
  * main's dataChanged push, so a dictation landing while the window is open
- * updates History and Stats live — and flares the mark in the rail, which is
+ * updates History and Stats live — and flares the mark in the title bar, which is
  * how the app says "heard you" without a toast.
  */
 
@@ -77,33 +77,28 @@ export function App(): React.JSX.Element {
 
   return (
     <div className="app">
-      <div className="titlebar" />
-      <nav className="rail" aria-label="Sections">
-        <img
-          className={`rail__mark${flare ? ' rail__mark--flare' : ''}`}
-          src={logoUrl}
-          alt="whisp"
-          width={32}
-          height={32}
-        />
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            className={`rail__item${tab === t.id ? ' rail__item--active' : ''}`}
-            aria-current={tab === t.id ? 'page' : undefined}
-            onClick={() => setTab(t.id)}
-          >
-            {t.icon}
-            <span>{t.label}</span>
-          </button>
-        ))}
-      </nav>
-      <main className="content">
-        {tab === 'listen' && <Listen data={data} goToKey={() => setTab('transcribe')} />}
-        {tab === 'transcribe' && <Transcribe data={data} refresh={refresh} />}
-        {tab === 'history' && <History data={data} />}
-        {tab === 'stats' && <StatsTab stats={data.stats} />}
-      </main>
+      <TitleBar flare={flare} />
+      <div className="frame">
+        <nav className="sidebar" aria-label="Sections">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              className={`sidebar__item${tab === t.id ? ' sidebar__item--active' : ''}`}
+              aria-current={tab === t.id ? 'page' : undefined}
+              onClick={() => setTab(t.id)}
+            >
+              {t.icon}
+              <span>{t.label}</span>
+            </button>
+          ))}
+        </nav>
+        <main className="content">
+          {tab === 'listen' && <Listen data={data} goToKey={() => setTab('transcribe')} />}
+          {tab === 'transcribe' && <Transcribe data={data} refresh={refresh} />}
+          {tab === 'history' && <History data={data} />}
+          {tab === 'stats' && <StatsTab stats={data.stats} />}
+        </main>
+      </div>
     </div>
   )
 }
@@ -136,7 +131,7 @@ function Listen({ data, goToKey }: { data: Data; goToKey: () => void }): React.J
 
       <div className="card">
         <h2 className="card__title">While you dictate</h2>
-        <Setting label="Music and video" hint={audioBehaviorHint(settings.audioBehavior)}>
+        <Setting stacked label="Music and video" hint={audioBehaviorHint(settings.audioBehavior)}>
           <Segmented
             ariaLabel="Music and video while dictating"
             options={DICTATION_AUDIO_BEHAVIORS.map((b) => ({ id: b.id, label: b.label }))}
@@ -380,6 +375,7 @@ function Transcribe({ data, refresh }: { data: Data; refresh: () => void }): Rea
       <div className="card">
         <h2 className="card__title">Transcriber</h2>
         <Setting
+          stacked
           label="Model"
           hint="gpt-4o-mini is the budget pick (about $0.003 a minute) but takes a single language hint. gpt-transcribe (about $0.0045) takes the whole set, so a Norwegian take can't come back as Swedish."
         >
@@ -390,7 +386,7 @@ function Transcribe({ data, refresh }: { data: Data; refresh: () => void }): Rea
             onChange={(id) => void window.whisp.settings.set({ model: id })}
           />
         </Setting>
-        <Setting label="Spoken languages" hint={languageHint(settings)}>
+        <Setting stacked label="Spoken languages" hint={languageHint(settings)}>
           <div className="seg" role="group" aria-label="Spoken languages">
             {DICTATION_LANGUAGES.map((lang) => {
               const on = settings.languages.includes(lang.code)
@@ -786,18 +782,23 @@ function StatsTab({ stats }: { stats: Stats }): React.JSX.Element {
 
 /* Shared controls ----------------------------------------------------------- */
 
-/** A settings row: name and explanation on the left, the control on the right. */
+/**
+ * A settings row: name and explanation on the left, the control on the
+ * right — or, for controls too wide to share a line, underneath.
+ */
 function Setting({
   label,
   hint,
+  stacked = false,
   children
 }: {
   label: string
   hint: string
+  stacked?: boolean
   children: React.ReactNode
 }): React.JSX.Element {
   return (
-    <div className="setting">
+    <div className={`setting${stacked ? ' setting--stacked' : ''}`}>
       <div className="setting__text">
         <span className="setting__label">{label}</span>
         <span className="setting__hint">{hint}</span>

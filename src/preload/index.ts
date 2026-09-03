@@ -7,7 +7,8 @@ import {
   type KeyStatus,
   type Stats,
   type WhispApi,
-  type WhispSettings
+  type WhispSettings,
+  type WindowControl
 } from '../shared/ipc'
 
 /**
@@ -55,6 +56,14 @@ const api: WhispApi = {
     const handler = (): void => listener()
     ipcRenderer.on(IPC.dataChanged, handler)
     return () => ipcRenderer.off(IPC.dataChanged, handler)
+  },
+  window: {
+    control: (action: WindowControl): void => ipcRenderer.send(IPC.windowControl, action),
+    onMaximized: (listener: (maximized: boolean) => void): (() => void) => {
+      const handler = (_: unknown, maximized: boolean): void => listener(maximized)
+      ipcRenderer.on(IPC.windowMaximized, handler)
+      return () => ipcRenderer.off(IPC.windowMaximized, handler)
+    }
   }
 }
 

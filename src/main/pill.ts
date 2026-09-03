@@ -17,14 +17,16 @@ import { BrowserWindow, screen } from 'electron'
  *    secure beyond an inert div.
  *
  * The window is larger than the lozenge: the margin around it is where the
- * glow, the shadow and the entrance ripple live. A transparent window can't
- * blur the desktop behind it, so the glass is painted, not sampled.
+ * glow, the shadow and the entrance ripple live. Windows can't blur the
+ * desktop behind a pill-shaped window (acrylic needs the whole rectangle),
+ * so the glass here is clear rather than frosted: a light tint, a hairline
+ * of light, and the desktop showing through.
  */
 
-const WIDTH = 320
-const HEIGHT = 84
+const WIDTH = 340
+const HEIGHT = 88
 /** The lozenge itself, centered in the window. */
-const PILL_WIDTH = 240
+const PILL_WIDTH = 260
 const PILL_HEIGHT = 44
 /** Distance from the work area's bottom edge to the lozenge's bottom edge. */
 const MARGIN_BOTTOM = 28
@@ -38,15 +40,15 @@ const PAGE = `<!doctype html>
   .stage {
     position: fixed; inset: 0;
     display: flex; align-items: center; justify-content: center;
-    font: 500 12.5px 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
-    color: rgba(240, 240, 250, 0.92);
+    font: 500 12px 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+    color: rgba(255, 255, 255, 0.92);
   }
   /* The lozenge blooms in and settles out; a fresh take also sends a ripple
      outward — the moment the mic opens should feel like something began. */
   .pill {
     position: relative;
     width: ${PILL_WIDTH}px; height: ${PILL_HEIGHT}px;
-    opacity: 0; transform: translateY(10px) scale(0.92);
+    opacity: 0; transform: translateY(10px) scale(0.94);
     transition: opacity 220ms ease-out, transform 320ms cubic-bezier(0.2, 0.9, 0.3, 1.15);
   }
   .in .pill { opacity: 1; transform: none; }
@@ -62,88 +64,83 @@ const PAGE = `<!doctype html>
   .ripple.go { animation: ripple 640ms cubic-bezier(0.2, 0.7, 0.3, 1) forwards; }
   @keyframes ripple {
     0%   { opacity: 0.6; transform: scale(1); }
-    100% { opacity: 0; transform: scale(1.22, 1.6); }
+    100% { opacity: 0; transform: scale(1.2, 1.6); }
   }
-  /* A one-pixel rim of light behind the body. It circles slowly in
-     hands-free — the one state that outlives the gesture, so the one that
-     visibly keeps going. */
-  .rim {
-    position: absolute; inset: -1px; border-radius: 999px;
-    background: rgba(255, 255, 255, 0.22);
-    transition: background 300ms;
-  }
-  .handsFree .rim {
-    background: conic-gradient(from var(--rim),
-      rgba(255,255,255,0.12) 0deg, rgba(255,255,255,0.12) 250deg,
-      rgba(230, 226, 255, 0.95) 300deg, rgba(255,255,255,0.12) 350deg);
-    animation: circle 3.6s linear infinite;
-  }
-  @keyframes circle { to { --rim: 360deg; } }
-  .error .rim { background: rgba(255, 170, 160, 0.4); }
+  /* Clear glass: a light tint so the line and the word read on anything,
+     the desktop visible through it, one hairline of light at the edge. */
   .body {
     position: absolute; inset: 0; border-radius: 999px;
-    display: flex; align-items: center; gap: 10px;
-    padding: 0 18px;
-    background: linear-gradient(180deg, rgba(48, 44, 96, 0.9), rgba(24, 22, 56, 0.94));
-    box-shadow:
-      0 12px 32px rgba(18, 16, 48, 0.42),
-      0 2px 6px rgba(18, 16, 48, 0.3),
-      inset 0 1px 0 rgba(255, 255, 255, 0.22);
-    transition: background 300ms;
-  }
-  /* The glint: light catching the top of the glass. */
-  .body::before {
-    content: ''; position: absolute; inset: 1px 14px auto 14px; height: 45%;
-    border-radius: 999px 999px 40% 40%;
-    background: linear-gradient(180deg, rgba(255,255,255,0.14), rgba(255,255,255,0));
-    pointer-events: none;
+    background: rgba(14, 12, 26, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.32);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22), inset 0 0 24px rgba(255, 255, 255, 0.05);
+    transition: background 300ms, border-color 300ms;
   }
   .error .body {
-    background: linear-gradient(180deg, rgba(104, 40, 52, 0.92), rgba(62, 22, 32, 0.95));
+    background: rgba(74, 20, 30, 0.58);
+    border-color: rgba(255, 176, 168, 0.5);
   }
-  #wave { display: block; flex: 1; height: 28px; min-width: 0; transition: flex-basis 220ms ease; }
+  /* A ring of light that circles the lozenge in hands-free — the one state
+     that outlives the gesture, so the one that visibly keeps going. Only
+     the ring is painted: the mask cuts the middle out so nothing shows
+     through the clear body. */
+  .rim {
+    position: absolute; inset: -1px; border-radius: 999px; padding: 1.5px;
+    opacity: 0; transition: opacity 400ms;
+    background: conic-gradient(from var(--rim),
+      rgba(255,255,255,0) 0deg, rgba(255,255,255,0) 240deg,
+      rgba(255, 255, 255, 0.95) 300deg, rgba(255,255,255,0) 360deg);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    animation: circle 3.6s linear infinite;
+  }
+  .handsFree .rim { opacity: 1; }
+  @keyframes circle { to { --rim: 360deg; } }
+  /* The canvas covers the whole body so the line's light is never clipped;
+     the string itself is drawn inset from the ends and short of the word. */
+  #wave { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
   #label {
+    position: absolute; right: 18px; top: 50%; transform: translateY(-50%);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    max-width: ${PILL_WIDTH - 110}px; letter-spacing: 0.01em;
+    max-width: ${PILL_WIDTH - 100}px; letter-spacing: 0.02em;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
     opacity: 0; transition: opacity 200ms;
   }
-  /* While recording the line is the whole message; the word appears only
-     when the line alone can't say what's happening. */
-  .recording #label { display: none; }
   .labelled #label { opacity: 1; }
-  .labelled #wave { flex: 0 0 76px; }
-  .handsFree #label { color: rgba(236, 233, 255, 0.98); }
-  .transcribing #label { color: rgba(220, 216, 245, 0.8); }
-  .error #label { color: rgba(255, 226, 220, 0.96); }
+  .error #label { color: rgba(255, 228, 224, 0.98); }
 </style></head>
 <body>
   <div id="stage" class="stage">
     <div id="pill" class="pill">
       <div id="ripple" class="ripple"></div>
+      <div class="body"></div>
       <div class="rim"></div>
-      <div class="body"><canvas id="wave"></canvas><span id="label"></span></div>
+      <canvas id="wave"></canvas><span id="label"></span>
     </div>
   </div>
   <script>
     /* The breath line: one luminous thread across the glass, pinned at both
        ends like a string. Silence leaves it barely undulating — alive, not
        flat. Voice plucks it: each mic band drives one harmonic, so a low
-       voice rolls in long swells and sibilants ripple the surface. While
-       transcribing the voice is gone and a single pulse of light travels the
-       string instead; an error lets it fall still and turns it warm. */
+       voice rolls in long swells and sibilants ripple the surface, and the
+       glass lights up behind it. While transcribing the voice is gone and a
+       slow wave travels the string instead, carrying a pulse of light; an
+       error lets it fall still and turns it warm. */
     var stage = document.getElementById('stage')
-    var pillEl = document.getElementById('pill')
     var rippleEl = document.getElementById('ripple')
     var labelEl = document.getElementById('label')
     var canvas = document.getElementById('wave')
     var ctx = canvas.getContext('2d')
     var dpr = Math.min(2, window.devicePixelRatio || 1)
     var cw = 0, ch = 0
+    var END = 18           /* where the string is pinned, in from each end */
+    var LABEL_GAP = 14     /* space between the string's end and the word */
 
     var mode = 'hidden'
     var target = [0, 0, 0, 0, 0]  /* latest mic bands, 0..1 */
     var amp = [0, 0, 0, 0, 0]     /* smoothed: swells fast, settles soft */
-    var energy = 0                /* overall level, for the glow */
+    var energy = 0                /* overall level, for the light */
     var t = 0
 
     function live(m) { return m === 'recording' || m === 'handsFree' }
@@ -155,9 +152,8 @@ const PAGE = `<!doctype html>
       stage.className = 'stage in ' + m + (labelled ? ' labelled' : '')
       labelEl.textContent =
         message || (m === 'handsFree' ? 'Hands-free' : m === 'transcribing' ? 'Transcribing' : '')
-      if (!live(m)) { levels([0, 0, 0, 0, 0]) }
-      if (fresh && !wasHidden) ripple()
-      if (fresh && wasHidden) setTimeout(ripple, 120)
+      if (!live(m)) levels([0, 0, 0, 0, 0])
+      if (fresh) setTimeout(ripple, wasHidden ? 120 : 0)
     }
     function ripple() {
       rippleEl.classList.remove('go')
@@ -184,7 +180,7 @@ const PAGE = `<!doctype html>
        how much of a band it takes to move it. Lower bands move more. */
     var CYCLES = [1, 2, 3.1, 4.4, 6]
     var DRIFT  = [1.3, -1.9, 2.6, -3.4, 4.1]
-    var GAIN   = [7, 5.5, 4, 2.6, 1.6]
+    var GAIN   = [9, 7, 5, 3.2, 2]
 
     function draw() {
       requestAnimationFrame(draw)
@@ -200,54 +196,69 @@ const PAGE = `<!doctype html>
       energy += (peak - energy) * (peak > energy ? 0.3 : 0.06)
       ctx.clearRect(0, 0, cw, ch)
 
+      var labelled = mode !== 'recording'
+      var x0 = END
+      var x1 = cw - END - (labelled ? labelEl.offsetWidth + LABEL_GAP : 0)
+      var span = Math.max(40, x1 - x0)
       var mid = ch / 2
       var breath = 0.5 + 0.5 * Math.sin(t * 1.6)
       var isLive = live(mode)
       var still = mode === 'error'
-      var pulseX = -0.2 + ((t * 0.55) % 1.5)   /* the transcribing light, in 0..1 of width */
+      var pulseU = -0.25 + ((t * 0.45) % 1.5)   /* the transcribing light, 0..1 along the string */
 
-      /* Two strokes: a soft wide halo colored by the voice, then the thread. */
+      /* The light in the glass: the voice lights the pane behind the string. */
+      if (isLive && energy > 0.02) {
+        var lg = ctx.createRadialGradient(x0 + span / 2, mid, 0, x0 + span / 2, mid, span * 0.55)
+        lg.addColorStop(0, 'rgba(210, 200, 255, ' + (energy * 0.34) + ')')
+        lg.addColorStop(1, 'rgba(210, 200, 255, 0)')
+        ctx.fillStyle = lg
+        ctx.fillRect(0, 0, cw, ch)
+      }
+
+      /* Two strokes: a soft wide halo, then the thread. */
+      var N = Math.max(24, Math.floor(span / 3))
       for (var pass = 0; pass < 2; pass++) {
         ctx.beginPath()
-        var N = Math.max(24, Math.floor(cw / 3))
         for (var i = 0; i <= N; i++) {
           var u = i / N
-          var x = u * cw
           var env = Math.pow(Math.sin(Math.PI * u), 0.85)
           var y = 0
           if (!still) {
-            y += Math.sin(u * 6.2832 * 1.0 + t * 1.1) * (0.45 + breath * 0.5)  /* the breath */
+            y += Math.sin(u * 6.2832 + t * 1.1) * (0.5 + breath * 0.6)   /* the breath */
             if (isLive) {
-              for (var k = 0; k < 5; k++) {
-                y += Math.sin(u * 6.2832 * CYCLES[k] + t * DRIFT[k]) * amp[k] * GAIN[k]
+              for (var k2 = 0; k2 < 5; k2++) {
+                y += Math.sin(u * 6.2832 * CYCLES[k2] + t * DRIFT[k2]) * amp[k2] * GAIN[k2]
               }
             } else {
-              var d = (u - pulseX) / 0.09
-              y += Math.exp(-d * d) * 3.2 * Math.sin(u * 6.2832 * 3 + t * 4)
+              y += Math.sin(u * 6.2832 * 1.5 - t * 2.2) * 3.2             /* the travelling wave */
+              var d = (u - pulseU) / 0.1
+              y += Math.exp(-d * d) * 2.5 * Math.sin(u * 6.2832 * 4 + t * 5)
             }
           }
+          var px = x0 + u * span
           var py = mid + y * env
-          if (i === 0) ctx.moveTo(x, py); else ctx.lineTo(x, py)
+          if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py)
         }
+        ctx.lineCap = 'round'
         if (pass === 0) {
-          ctx.lineWidth = 7
+          ctx.lineWidth = 9
           ctx.strokeStyle = still
-            ? 'rgba(255, 150, 140, 0.18)'
-            : 'rgba(186, 178, 255, ' + (0.1 + energy * 0.5) + ')'
+            ? 'rgba(255, 150, 140, 0.16)'
+            : 'rgba(200, 192, 255, ' + (0.12 + energy * 0.45) + ')'
         } else {
-          ctx.lineWidth = 1.6
-          ctx.lineCap = 'round'
+          ctx.lineWidth = 1.7
           ctx.strokeStyle = still
-            ? 'rgba(255, 196, 188, 0.85)'
-            : 'rgba(255, 255, 255, ' + (0.72 + energy * 0.28) + ')'
+            ? 'rgba(255, 200, 192, 0.9)'
+            : 'rgba(255, 255, 255, ' + (0.8 + energy * 0.2) + ')'
         }
         ctx.stroke()
       }
       /* The transcribing pulse carries its own light along the thread. */
       if (!isLive && !still) {
-        var g = ctx.createRadialGradient(pulseX * cw, mid, 0, pulseX * cw, mid, 26)
-        g.addColorStop(0, 'rgba(226, 220, 255, 0.55)')
-        g.addColorStop(1, 'rgba(226, 220, 255, 0)')
+        var px2 = x0 + pulseU * span
+        var g = ctx.createRadialGradient(px2, mid, 0, px2, mid, 30)
+        g.addColorStop(0, 'rgba(230, 224, 255, 0.5)')
+        g.addColorStop(1, 'rgba(230, 224, 255, 0)')
         ctx.fillStyle = g
         ctx.fillRect(0, 0, cw, ch)
       }

@@ -1,5 +1,6 @@
 import { join } from 'node:path'
-import { BrowserWindow, shell } from 'electron'
+import { BrowserWindow, shell, type IpcMain } from 'electron'
+import { IPC, type WindowControl } from '../shared/ipc'
 
 /**
  * whisp's two real windows (the pill is pill.ts's own):
@@ -8,8 +9,11 @@ import { BrowserWindow, shell } from 'electron'
  *   lives in a renderer. It is the microphone and nothing else — the
  *   settings window can open, close and crash without touching it, which is
  *   what keeps a recording in flight safe from the UI.
- * - The settings window: the visible app — key, dictionary, history, stats.
- *   Opens from the tray, closes for real; the tray keeps the app alive.
+ * - The settings window: the visible app — one sheet of glass. Windows 11
+ *   acrylic blurs the desktop through it, which only works on a frameless
+ *   window (Electron treats material + frame as opaque), so the page draws
+ *   its own title bar and window buttons. Opens from the tray, closes for
+ *   real; the tray keeps the app alive.
  */
 
 import appIcon from '../../resources/whisp.ico?asset'
@@ -44,32 +48,52 @@ export function openSettingsWindow(): BrowserWindow {
     return settingsWin
   }
   settingsWin = new BrowserWindow({
-    width: 780,
-    height: 580,
-    minWidth: 640,
+    width: 820,
+    height: 600,
+    minWidth: 660,
     minHeight: 480,
-    autoHideMenuBar: true,
-    // The window is one pane of dusk glass: no title bar, the OS controls
-    // float over the sky's top color and the page provides the drag strip.
-    titleBarStyle: 'hidden',
-    titleBarOverlay: { color: '#7c89dc', symbolColor: '#ffffff', height: 36 },
-    backgroundColor: '#a3a8e7',
+    frame: false,
+    // Acrylic: the desktop, blurred, is the window's background. Electron
+    // makes the page transparent itself when a material is set on a
+    // frameless window, so no backgroundColor here — one would paint over it.
+    // Below Windows 11 22H2 the material is ignored and the page's own dark
+    // tint is what shows.
+    backgroundMaterial: 'acrylic',
     icon: appIcon,
     webPreferences: { preload: preloadPath }
   })
-  settingsWin.on('closed', () => {
+  const win = settingsWin
+  win.on('closed', () => {
     settingsWin = null
   })
+  const tellMaximized = (): void => {
+    if (!win.isDestroyed()) win.webContents.send(IPC.windowMaximized, win.isMaximized())
+  }
+  win.on('maximize', tellMaximized)
+  win.on('unmaximize', tellMaximized)
   // External links (none today, but any future "get an API key" link) open
   // in the browser, never inside the settings window.
-  settingsWin.webContents.setWindowOpenHandler(({ url }) => {
+  win.webContents.setWindowOpenHandler(({ url }) => {
     void shell.openExternal(url)
     return { action: 'deny' }
   })
-  loadPage(settingsWin, 'settings.html')
-  return settingsWin
+  loadPage(win, 'settings.html')
+  return win
 }
 
 export function settingsWindow(): BrowserWindow | null {
   return settingsWin && !settingsWin.isDestroyed() ? settingsWin : null
+}
+
+/** The title-bar buttons the frameless settings window draws for itself. */
+export function registerWindowControls(ipc: IpcMain): void {
+  ipc.on(IPC.windowControl, (event, action: WindowControl) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (!win || win !== settingsWin) return
+    if (action === 'minimize') win.minimize()
+    else if (action === 'maximize') {
+      if (win.isMaximized()) win.unmaximize()
+      else win.maximize()
+    } else if (action === 'close') win.close()
+  })
 }
