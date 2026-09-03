@@ -244,6 +244,12 @@ function General({ data, refresh }: { data: Data; refresh: () => void }): React.
       <div className="card">
         <h2 className="eyebrow">Behavior</h2>
         <Toggle
+          label="Clean up transcripts"
+          hint="Before pasting, a small text model drops fillers and false starts, applies “scratch that”, and fixes punctuation. Adds about a second. Off pastes the transcriber's words verbatim."
+          checked={settings.cleanup}
+          onChange={(v) => void window.whisp.settings.set({ cleanup: v })}
+        />
+        <Toggle
           label="Hands-free double-tap"
           hint="Tap Ctrl+Win twice quickly and whisp keeps listening with the keys released — talk while you read something else, then tap once more with the target focused to paste there. Stops on its own after 5 minutes."
           checked={settings.handsFree}

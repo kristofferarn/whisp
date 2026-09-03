@@ -24,8 +24,13 @@ into a standalone tray app.
   output or pauses active media sessions, then restores what whisp changed.
 - **Transcription** — OpenAI `POST /v1/audio/transcriptions` with
   `gpt-4o-mini-transcribe` or `gpt-transcribe` (a Settings knob), biased by
-  your Dictionary words and hinted with your spoken languages.
+  your Dictionary words (`keywords[]` on gpt-transcribe, `prompt` on mini)
+  and hinted with your spoken languages.
+- **Cleanup** — optionally, one `POST /v1/responses` on `gpt-5.4-nano` with
+  reasoning off: fillers and false starts out, "scratch that" applied,
+  punctuation fixed. Any failure pastes the raw transcript instead.
 - **Paste** — clipboard-carried: snapshot, `Ctrl+V` via `SendInput`, restore.
+  If the paste can't happen, the transcript stays on the clipboard.
 - **UI** — a floating pill while dictating; a tray icon always; a settings
   window (key, dictionary, history, stats) on demand.
 

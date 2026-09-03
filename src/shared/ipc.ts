@@ -84,11 +84,18 @@ export type DictationAudioBehavior = (typeof DICTATION_AUDIO_BEHAVIORS)[number][
 export interface WhispSettings {
   /**
    * Vocabulary bias for the transcriber — names and jargon it would
-   * otherwise mishear. Joined into the transcription request's prompt.
+   * otherwise mishear. Sent as `keywords[]` on gpt-transcribe, joined into
+   * `prompt` on the mini model, and spelled out to the cleanup pass.
    */
   dictionary: string[]
   /** Which transcription model requests use (a Settings knob, price vs. accuracy). */
   model: TranscribeModel
+  /**
+   * Run the transcript through a small text model before pasting: fillers
+   * and false starts out, self-corrections applied, punctuation fixed. Off
+   * pastes the transcriber's words verbatim.
+   */
+  cleanup: boolean
   /**
    * Spoken languages, hinted with every request. gpt-transcribe takes the
    * whole set; the mini model's API fits one code, so it's hinted only when
@@ -117,6 +124,7 @@ export interface WhispSettings {
 export const DEFAULT_SETTINGS: WhispSettings = {
   dictionary: [],
   model: 'gpt-4o-mini-transcribe',
+  cleanup: false,
   languages: ['en', 'no'],
   handsFree: true,
   chime: true,

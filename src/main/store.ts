@@ -120,13 +120,15 @@ function sanitizeDictionary(words: unknown): string[] {
   const clean: string[] = []
   for (const word of words) {
     if (typeof word !== 'string') continue
-    const trimmed = word.trim().slice(0, 64)
+    // gpt-transcribe rejects the whole request over a keyword containing
+    // angle brackets or a line break, so those never make it into the list.
+    const trimmed = word.replace(/[<>\r\n]/g, '').trim().slice(0, 64)
     const fold = trimmed.toLowerCase()
     if (!trimmed || seen.has(fold)) continue
     seen.add(fold)
     clean.push(trimmed)
   }
-  // The prompt rides every request; a boundless dictionary would bloat it.
+  // The dictionary rides every request; a boundless one would bloat it.
   return clean.slice(0, 100)
 }
 
