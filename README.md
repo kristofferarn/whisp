@@ -32,7 +32,8 @@ into a standalone tray app.
 - **Paste** — clipboard-carried: snapshot, `Ctrl+V` via `SendInput`, restore.
   If the paste can't happen, the transcript stays on the clipboard.
 - **UI** — a floating pill while dictating; a tray icon always; a settings
-  window (key, dictionary, history, stats) on demand.
+  window on demand (Listen: mic and gestures; Transcribe: key, model,
+  languages, dictionary; History; Stats).
 
 ## Development
 

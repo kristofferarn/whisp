@@ -49,7 +49,11 @@ export function openSettingsWindow(): BrowserWindow {
     minWidth: 640,
     minHeight: 480,
     autoHideMenuBar: true,
-    backgroundColor: '#090a0b',
+    // The window is one pane of dusk glass: no title bar, the OS controls
+    // float over the sky's top color and the page provides the drag strip.
+    titleBarStyle: 'hidden',
+    titleBarOverlay: { color: '#7c89dc', symbolColor: '#ffffff', height: 36 },
+    backgroundColor: '#a3a8e7',
     icon: appIcon,
     webPreferences: { preload: preloadPath }
   })
