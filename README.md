@@ -44,6 +44,7 @@ are enough; Xcode is optional (open `Package.swift` in it if you like).
 ```
 scripts/run.sh                      # build "whisp dev" and run it, logs in the terminal
 scripts/build.sh release --install  # build whisp.app and copy it to /Applications
+scripts/update.sh                   # pull, build, swap the installed whisp, reopen it
 swift test                          # gesture, queue, settings and cleanup tests
 ```
 
