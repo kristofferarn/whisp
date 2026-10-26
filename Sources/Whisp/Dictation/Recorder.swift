@@ -1,114 +1,133 @@
-import AudioToolbox
 import AVFoundation
+import CoreMedia
 
 /**
- * The microphone, open for exactly as long as a take records. A fresh engine
- * per take keeps the orange recording dot honest — lit only while you are
- * dictating — and lets a newly chosen microphone apply at once.
+ * The microphone, open for exactly as long as a take records — the orange
+ * recording dot is lit only while you are dictating.
  *
- * Opening and closing happen on a serial queue of their own, because both
- * can block for a second: a Bluetooth headset has to switch from its music
- * profile to its headset profile before its microphone delivers anything.
- * The take is live from the caller's point of view the moment `start`
- * returns; audio simply starts arriving when the hardware is ready, and the
- * capture says so (its first buffer).
+ * Built on AVCaptureSession rather than AVAudioEngine. Pointing an engine's
+ * input at a particular microphone fires the engine's own "route changed"
+ * notification, invalidates the formats it has already reported, and leaves
+ * the next start failing with "format not supported". A capture session is
+ * made for opening one specific device: it takes the microphone by its ID,
+ * leaves the system default alone, and converts to the format asked for
+ * (16 kHz mono float) before handing the audio over.
  *
- * That switch also changes the microphone's format under the engine's feet
- * (AirPods go to 24 kHz), so the tap never names a format — it takes
- * whatever the node delivers, and the capture converts. Naming one that has
- * gone stale makes AVAudioEngine throw an Objective-C exception, which no
- * Swift code can catch. When the route changes mid-take (a headset connects
- * or drops), the engine stops itself; it is rebuilt and the take carries on.
+ * Opening happens on a serial queue of its own, since it can take a moment;
+ * the take is live from the caller's point of view as soon as `start`
+ * returns, and the capture reports its first buffer when audio really flows.
  */
-nonisolated final class Recorder: @unchecked Sendable {
+nonisolated final class Recorder: NSObject, AVCaptureAudioDataOutputSampleBufferDelegate, @unchecked Sendable {
     enum Failure: LocalizedError {
         case noInput
-        var errorDescription: String? { "No microphone is available" }
+        case unusable(String)
+
+        var errorDescription: String? {
+            switch self {
+            case .noInput: "No microphone is available"
+            case .unusable(let name): "\(name) can't be used for recording"
+            }
+        }
     }
 
-    private let queue = DispatchQueue(label: "whisp.recorder", qos: .userInteractive)
-    // Queue only.
-    private var engine: AVAudioEngine?
-    private var current: (microphoneUID: String?, avoidBluetooth: Bool, capture: TakeCapture)?
-    private var observer: NSObjectProtocol?
+    private let control = DispatchQueue(label: "whisp.recorder", qos: .userInteractive)
+    private let delivery = DispatchQueue(label: "whisp.recorder.audio", qos: .userInteractive)
+    private let lock = NSLock()
+    // Control queue only.
+    private var session: AVCaptureSession?
+    // Under lock: read on the delivery queue.
+    private var capture: TakeCapture?
 
     func start(
         microphoneUID: String?, avoidBluetooth: Bool, into capture: TakeCapture,
         failed: @escaping @Sendable (Error) -> Void
     ) {
-        queue.async { [self] in
-            stopEngine()
-            current = (microphoneUID, avoidBluetooth, capture)
+        control.async { [self] in
+            stopSession()
             let began = ProcessInfo.processInfo.systemUptime
             do {
-                try startEngine()
+                let device = try Self.device(microphoneUID: microphoneUID, avoidBluetooth: avoidBluetooth)
+                let session = try makeSession(device)
+                lock.withLock { self.capture = capture }
+                session.startRunning()
+                self.session = session
                 let ms = Int((ProcessInfo.processInfo.systemUptime - began) * 1000)
-                Log.audio.info("microphone opened in \(ms) ms")
+                Log.audio.info("\(device.localizedName, privacy: .public) opened in \(ms) ms")
             } catch {
                 Log.audio.error("microphone failed to open: \(error.localizedDescription, privacy: .public)")
-                current = nil
                 failed(error)
             }
         }
     }
 
     func stop() {
-        queue.async { [self] in
-            current = nil
-            stopEngine()
-        }
+        control.async { [self] in stopSession() }
     }
 
-    private func startEngine() throws {
-        guard let current else { return }
-        let engine = AVAudioEngine()
-        let input = engine.inputNode
-        // A chosen microphone that is plugged in wins; one that has gone away
-        // falls back to the default rather than failing the take — and a
-        // Bluetooth default gives way to the built-in mic when asked to.
-        if let device = AudioDevices.resolveInput(uid: current.microphoneUID, avoidBluetooth: current.avoidBluetooth),
-           let unit = input.audioUnit {
-            var id = device.id
-            AudioUnitSetProperty(
-                unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0,
-                &id, UInt32(MemoryLayout<AudioDeviceID>.size)
-            )
-            Log.audio.info("using microphone \(device.name, privacy: .public)")
+    /** The chosen microphone while it's connected, else the default — with a Bluetooth default traded for the built-in mic when asked. */
+    private static func device(microphoneUID: String?, avoidBluetooth: Bool) throws -> AVCaptureDevice {
+        if let resolved = AudioDevices.resolveInput(uid: microphoneUID, avoidBluetooth: avoidBluetooth),
+           let device = AVCaptureDevice(uniqueID: resolved.uid) {
+            return device
         }
-        let hardware = input.inputFormat(forBus: 0)
-        guard hardware.sampleRate > 0, hardware.channelCount > 0 else { throw Failure.noInput }
-        let capture = current.capture
-        input.installTap(onBus: 0, bufferSize: 1024, format: nil) { buffer, _ in
+        guard let device = AVCaptureDevice.default(for: .audio) else { throw Failure.noInput }
+        return device
+    }
+
+    private func makeSession(_ device: AVCaptureDevice) throws -> AVCaptureSession {
+        let session = AVCaptureSession()
+        let input = try AVCaptureDeviceInput(device: device)
+        let output = AVCaptureAudioDataOutput()
+        output.audioSettings = [
+            AVFormatIDKey: kAudioFormatLinearPCM,
+            AVSampleRateKey: TakeCapture.sampleRate,
+            AVNumberOfChannelsKey: 1,
+            AVLinearPCMBitDepthKey: 32,
+            AVLinearPCMIsFloatKey: true,
+            AVLinearPCMIsNonInterleaved: true,
+            AVLinearPCMIsBigEndianKey: false
+        ]
+        output.setSampleBufferDelegate(self, queue: delivery)
+        session.beginConfiguration()
+        guard session.canAddInput(input), session.canAddOutput(output) else {
+            session.commitConfiguration()
+            throw Failure.unusable(device.localizedName)
+        }
+        session.addInput(input)
+        session.addOutput(output)
+        session.commitConfiguration()
+        return session
+    }
+
+    private func stopSession() {
+        lock.withLock { capture = nil }
+        guard let session else { return }
+        session.stopRunning()
+        self.session = nil
+    }
+
+    // MARK: Delivery queue
+
+    func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        guard let capture = lock.withLock({ capture }), let buffer = Self.pcmBuffer(sampleBuffer) else { return }
+        if buffer.format == TakeCapture.format {
+            capture.append(converted: buffer)
+        } else {
             capture.append(native: buffer)
         }
-        observer = NotificationCenter.default.addObserver(
-            forName: .AVAudioEngineConfigurationChange, object: engine, queue: nil
-        ) { [weak self] _ in
-            guard let self else { return }
-            queue.async { self.restartAfterRouteChange() }
-        }
-        engine.prepare()
-        try engine.start()
-        self.engine = engine
     }
 
-    private func restartAfterRouteChange() {
-        guard current != nil else { return }
-        Log.audio.info("audio route changed mid-take; reopening the microphone")
-        stopEngine()
-        do {
-            try startEngine()
-        } catch {
-            Log.audio.error("microphone could not reopen: \(error.localizedDescription, privacy: .public)")
-        }
-    }
-
-    private func stopEngine() {
-        if let observer { NotificationCenter.default.removeObserver(observer) }
-        observer = nil
-        guard let engine else { return }
-        engine.inputNode.removeTap(onBus: 0)
-        engine.stop()
-        self.engine = nil
+    private static func pcmBuffer(_ sampleBuffer: CMSampleBuffer) -> AVAudioPCMBuffer? {
+        guard let description = CMSampleBufferGetFormatDescription(sampleBuffer),
+              let stream = CMAudioFormatDescriptionGetStreamBasicDescription(description),
+              let format = AVAudioFormat(streamDescription: stream)
+        else { return nil }
+        let frames = AVAudioFrameCount(CMSampleBufferGetNumSamples(sampleBuffer))
+        guard frames > 0, let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames) else { return nil }
+        buffer.frameLength = frames
+        let status = CMSampleBufferCopyPCMDataIntoAudioBufferList(
+            sampleBuffer, at: 0, frameCount: Int32(frames), into: buffer.mutableAudioBufferList
+        )
+        return status == noErr ? buffer : nil
     }
 }
