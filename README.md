@@ -69,9 +69,12 @@ Settings pane, the popover, the welcome window and the pill states to PNGs
 
 ### A stable signing certificate (do this once)
 
-macOS ties the Microphone, Accessibility and Input Monitoring permissions to
-the app's signature. Without a certificate the build is signed ad-hoc, and
-every rebuild has to be granted those permissions again. To avoid that:
+Started by `scripts/run.sh`, whisp is a child of your terminal, and macOS
+applies the terminal app's Microphone and Accessibility permissions, so no
+signing is needed for development. An installed whisp (opened from Finder,
+Spotlight or at login) gets its own permissions, tied to its signature.
+Signed ad-hoc, every update would have to be granted them again. To avoid
+that:
 
 1. Open **Keychain Access** (Spotlight finds it).
 2. Choose **Keychain Access → Certificate Assistant → Create a Certificate…**

@@ -43,7 +43,7 @@ sed -e "s/__BUNDLE_ID__/$bundle_id/" \
 
 identity=${WHISP_SIGN_IDENTITY:-whisp Dev}
 if ! security find-identity -p codesigning | grep -q "\"$identity\""; then
-  echo "note: no \"$identity\" signing certificate — signing ad-hoc; macOS will ask for permissions again after each build" >&2
+  echo "note: no \"$identity\" signing certificate — signing ad-hoc. Fine for scripts/run.sh (the terminal's permissions apply); an installed copy would ask for permissions again after each update" >&2
   identity=-
 fi
 codesign --force --options runtime --timestamp=none \
