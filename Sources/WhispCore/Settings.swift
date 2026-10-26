@@ -67,7 +67,10 @@ public struct WhispSettings: Codable, Equatable, Sendable {
         var seen = Set<String>()
         var clean: [String] = []
         for word in words {
-            let stripped = word.filter { !"<>\r\n".contains($0) }
+            // By scalar: in a Swift string "\r\n" is one Character, so a
+            // character filter would let a lone "\n" through.
+            let banned = CharacterSet(charactersIn: "<>\r\n")
+            let stripped = String(String.UnicodeScalarView(word.unicodeScalars.filter { !banned.contains($0) }))
             let trimmed = String(stripped.trimmingCharacters(in: .whitespaces).prefix(64))
             let fold = trimmed.lowercased()
             if trimmed.isEmpty || seen.contains(fold) { continue }
