@@ -29,13 +29,16 @@ nonisolated final class Recorder: @unchecked Sendable {
     private let queue = DispatchQueue(label: "whisp.recorder", qos: .userInteractive)
     // Queue only.
     private var engine: AVAudioEngine?
-    private var current: (microphoneUID: String?, capture: TakeCapture)?
+    private var current: (microphoneUID: String?, avoidBluetooth: Bool, capture: TakeCapture)?
     private var observer: NSObjectProtocol?
 
-    func start(microphoneUID: String?, into capture: TakeCapture, failed: @escaping @Sendable (Error) -> Void) {
+    func start(
+        microphoneUID: String?, avoidBluetooth: Bool, into capture: TakeCapture,
+        failed: @escaping @Sendable (Error) -> Void
+    ) {
         queue.async { [self] in
             stopEngine()
-            current = (microphoneUID, capture)
+            current = (microphoneUID, avoidBluetooth, capture)
             let began = ProcessInfo.processInfo.systemUptime
             do {
                 try startEngine()
@@ -61,12 +64,16 @@ nonisolated final class Recorder: @unchecked Sendable {
         let engine = AVAudioEngine()
         let input = engine.inputNode
         // A chosen microphone that is plugged in wins; one that has gone away
-        // falls back to the system default rather than failing the take.
-        if let uid = current.microphoneUID, var device = AudioDevices.deviceID(forUID: uid), let unit = input.audioUnit {
+        // falls back to the default rather than failing the take — and a
+        // Bluetooth default gives way to the built-in mic when asked to.
+        if let device = AudioDevices.resolveInput(uid: current.microphoneUID, avoidBluetooth: current.avoidBluetooth),
+           let unit = input.audioUnit {
+            var id = device.id
             AudioUnitSetProperty(
                 unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0,
-                &device, UInt32(MemoryLayout<AudioDeviceID>.size)
+                &id, UInt32(MemoryLayout<AudioDeviceID>.size)
             )
+            Log.audio.info("using microphone \(device.name, privacy: .public)")
         }
         let hardware = input.inputFormat(forBus: 0)
         guard hardware.sampleRate > 0, hardware.channelCount > 0 else { throw Failure.noInput }

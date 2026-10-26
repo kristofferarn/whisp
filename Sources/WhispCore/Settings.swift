@@ -29,6 +29,14 @@ public struct WhispSettings: Codable, Equatable, Sendable {
     public var chime = true
     /** A CoreAudio device UID, or nil to follow the system's default input. */
     public var microphoneUID: String?
+    /**
+     * When following the default input and that is a Bluetooth headset, use
+     * the Mac's built-in microphone instead. Opening a headset's microphone
+     * switches it to its call profile: a second of silence first (clipped
+     * words, a swallowed chime) and call-quality audio for everything else
+     * playing until the take ends.
+     */
+    public var preferBuiltInMicrophone = true
     /** Turn other audio down while the microphone is open. */
     public var lowerAudio = true
     public var keepHistory = true
@@ -51,6 +59,7 @@ public struct WhispSettings: Codable, Equatable, Sendable {
         handsFree = (try? c.decodeIfPresent(Bool.self, forKey: .handsFree)) ?? d.handsFree
         chime = (try? c.decodeIfPresent(Bool.self, forKey: .chime)) ?? d.chime
         microphoneUID = (try? c.decodeIfPresent(String.self, forKey: .microphoneUID)) ?? d.microphoneUID
+        preferBuiltInMicrophone = (try? c.decodeIfPresent(Bool.self, forKey: .preferBuiltInMicrophone)) ?? d.preferBuiltInMicrophone
         lowerAudio = (try? c.decodeIfPresent(Bool.self, forKey: .lowerAudio)) ?? d.lowerAudio
         keepHistory = (try? c.decodeIfPresent(Bool.self, forKey: .keepHistory)) ?? d.keepHistory
         launchAtLogin = (try? c.decodeIfPresent(Bool.self, forKey: .launchAtLogin)) ?? d.launchAtLogin

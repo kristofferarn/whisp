@@ -2,6 +2,8 @@ import AVFoundation
 import WhispCore
 
 /**
+ * `Whisp --microphones` lists the inputs and which one a take would open.
+ *
  * `Whisp --transcribe <file> [--engine apple|openai] [--cleaner off|apple|openai] [--language en|no]`
  *
  * Runs a sound file through the same pipeline a take uses and prints the raw
@@ -10,10 +12,13 @@ import WhispCore
  * the app's settings.
  */
 enum CommandLineMode {
-    static var requested: Bool { CommandLine.arguments.contains("--transcribe") }
+    static var requested: Bool {
+        CommandLine.arguments.contains("--transcribe") || CommandLine.arguments.contains("--microphones")
+    }
 
     static func run(model: AppModel) async -> Int32 {
         let args = CommandLine.arguments
+        if args.contains("--microphones") { return microphones(model.settings) }
         func value(_ flag: String) -> String? {
             args.firstIndex(of: flag).flatMap { args.indices.contains($0 + 1) ? args[$0 + 1] : nil }
         }
@@ -69,6 +74,21 @@ enum CommandLineMode {
             print("error: \(error.localizedDescription)")
             return 1
         }
+    }
+
+    private static func microphones(_ settings: WhispSettings) -> Int32 {
+        let fallback = AudioDevices.defaultInput()
+        for device in AudioDevices.inputs() {
+            let kind = device.isBluetooth ? "bluetooth" : device.isBuiltIn ? "built-in" : "other"
+            print("\(device.id == fallback?.id ? "*" : " ") \(device.name) [\(kind)]")
+        }
+        for avoid in [true, false] {
+            let picked = AudioDevices.resolveInput(uid: nil, avoidBluetooth: avoid) ?? fallback
+            print("system default, prefer built-in \(avoid ? "on: " : "off:") \(picked?.name ?? "none")")
+        }
+        let yours = AudioDevices.resolveInput(uid: settings.microphoneUID, avoidBluetooth: settings.preferBuiltInMicrophone) ?? fallback
+        print("with your settings: \(yours?.name ?? "none")")
+        return 0
     }
 
     private static func feed(_ url: URL, into capture: TakeCapture) throws {

@@ -82,6 +82,7 @@ struct SettingsTests {
         #expect(settings.hotkey == .fn)
         #expect(settings.dictionary == ["A"])
         #expect(settings.handsFree)
+        #expect(settings.preferBuiltInMicrophone)
     }
 
     @Test func roundTrips() throws {

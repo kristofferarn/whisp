@@ -134,7 +134,9 @@ final class DictationController {
             let live = ProcessInfo.processInfo.systemUptime
             Task { @MainActor in self?.microphoneLive(take: id, after: live - asked) }
         }
-        recorder.start(microphoneUID: settings.microphoneUID, into: capture) { [weak self] _ in
+        recorder.start(
+            microphoneUID: settings.microphoneUID, avoidBluetooth: settings.preferBuiltInMicrophone, into: capture
+        ) { [weak self] _ in
             Task { @MainActor in self?.microphoneFailed(take: id) }
         }
         var apple: Task<AppleSpeechSession, Error>?
