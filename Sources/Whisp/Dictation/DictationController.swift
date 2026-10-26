@@ -43,6 +43,7 @@ final class DictationController {
     private var meter: Timer?
     private var permissionRetry: Task<Void, Never>?
     private var flashTask: Task<Void, Never>?
+    private var duckTask: Task<Void, Never>?
 
     private var now: TimeInterval { ProcessInfo.processInfo.systemUptime }
 
@@ -150,8 +151,15 @@ final class DictationController {
         model.liveText = ""
         flashTask?.cancel()
         model.flash = nil
-        if settings.lowerAudio { ducker.lower() }
         if settings.chime { Chime.play() }
+        if settings.lowerAudio {
+            // Lowering the output lowers the chime too, so let it ring first.
+            duckTask = Task {
+                try? await Task.sleep(for: settings.chime ? Chime.duration : .zero)
+                guard !Task.isCancelled, current?.id == id else { return }
+                ducker.lower()
+            }
+        }
         startMeter()
     }
 
@@ -196,6 +204,8 @@ final class DictationController {
     private func stopRecording(_ take: Take) {
         recorder.stop()
         take.capture.close()
+        duckTask?.cancel()
+        duckTask = nil
         ducker.restore()
         stopMeter()
         model.resetLevels()
@@ -302,10 +312,14 @@ final class DictationController {
     }
 }
 
+/** The tick that says the microphone is open. */
 enum Chime {
+    /** How long it rings — lowering other audio waits this long. */
+    static let duration: Duration = .milliseconds(250)
+
     private static let sound: NSSound? = {
         let sound = NSSound(named: "Tink")
-        sound?.volume = 0.25
+        sound?.volume = 0.6
         return sound
     }()
 
