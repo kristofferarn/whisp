@@ -30,6 +30,18 @@ nonisolated final class TakeCapture: @unchecked Sendable {
     private var converter: AVAudioConverter?
     private var sink: (@Sendable (AVAudioPCMBuffer) -> Void)?
     private var closed = false
+    private var heardAudio = false
+
+    /**
+     * Called once, from the audio thread, when the first audio arrives — the
+     * moment the microphone is really live, which can be a second after it
+     * was asked for (a Bluetooth headset switching profiles).
+     */
+    let onFirstAudio: (@Sendable () -> Void)?
+
+    init(onFirstAudio: (@Sendable () -> Void)? = nil) {
+        self.onFirstAudio = onFirstAudio
+    }
 
     // MARK: Audio thread
 
@@ -47,13 +59,16 @@ nonisolated final class TakeCapture: @unchecked Sendable {
         let rms = (sum / Float(count)).squareRoot()
         let decibels = 20 * log10(max(rms, 1e-7))
         let level = min(max((decibels + 55) / 45, 0), 1)
-        lock.withLock {
-            guard !closed else { return }
+        let first: Bool = lock.withLock {
+            guard !closed else { return false }
             samples.append(contentsOf: UnsafeBufferPointer(start: channel, count: count))
             if level > Self.speechLevel { voicedSeconds += Double(count) / Self.sampleRate }
             latestLevel = level
             sink?(buffer)
+            defer { heardAudio = true }
+            return !heardAudio
         }
+        if first { onFirstAudio?() }
     }
 
     private func convert(_ buffer: AVAudioPCMBuffer) -> AVAudioPCMBuffer? {

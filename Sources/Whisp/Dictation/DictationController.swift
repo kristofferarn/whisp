@@ -28,7 +28,7 @@ final class DictationController {
 
     private let model: AppModel
     private let pill: PillPanel
-    private let hotkey = Hotkey()
+    private var hotkey: Hotkey!
     private let recorder = Recorder()
     private let inserter = Inserter()
     private let ducker = AudioDucker()
@@ -44,6 +44,7 @@ final class DictationController {
     private var permissionRetry: Task<Void, Never>?
     private var flashTask: Task<Void, Never>?
     private var duckTask: Task<Void, Never>?
+    private var meterTicks = 0
 
     private var now: TimeInterval { ProcessInfo.processInfo.systemUptime }
 
@@ -53,17 +54,9 @@ final class DictationController {
     }
 
     func start() {
+        hotkey = Hotkey { [unowned self] edge in handle(edge) }
         hotkey.choice = model.settings.hotkey
         gesture.handsFree = model.settings.handsFree
-        hotkey.onPress = { [unowned self] in apply(gesture.press(at: now, muted: model.muted)) }
-        hotkey.onRelease = { [unowned self] in apply(gesture.release(at: now)) }
-        hotkey.onChord = { [unowned self] in apply(gesture.chord()) }
-        hotkey.onEscape = { [unowned self] in
-            let actions = gesture.cancel()
-            apply(actions)
-            return !actions.isEmpty
-        }
-        hotkey.onPasteLast = { [unowned self] in pasteLast() }
         model.onSettingsChanged = { [unowned self] _ in
             hotkey.choice = model.settings.hotkey
             gesture.handsFree = model.settings.handsFree
@@ -96,7 +89,18 @@ final class DictationController {
 
     // MARK: Gesture actions
 
+    private func handle(_ edge: Hotkey.Edge) {
+        switch edge {
+        case .press(let at): apply(gesture.press(at: at, muted: model.muted))
+        case .release(let at): apply(gesture.release(at: at))
+        case .chord: apply(gesture.chord())
+        case .escape: apply(gesture.cancel())
+        case .pasteLast: pasteLast()
+        }
+    }
+
     private func apply(_ actions: [Gesture.Action]) {
+        if !actions.isEmpty { Log.take.debug("gesture: \(String(describing: actions), privacy: .public)") }
         for action in actions {
             switch action {
             case .start: startTake()
@@ -106,6 +110,7 @@ final class DictationController {
             case .capped: flash("Hands-free stopped after 5 minutes")
             }
         }
+        hotkey.recording = gesture.takeOpen
         updateTicker()
         refresh()
         if !gesture.latched { flush() }
@@ -122,19 +127,16 @@ final class DictationController {
             return
         }
 
-        let capture = TakeCapture()
-        do {
-            try recorder.start(microphoneUID: settings.microphoneUID, into: capture)
-        } catch {
-            _ = gesture.cancel()
-            flash(Permissions.microphone == .authorized
-                ? "The microphone wouldn't open"
-                : "whisp needs microphone access — see Settings", force: true)
-            return
-        }
-
         takeCounter += 1
         let id = takeCounter
+        let asked = now
+        let capture = TakeCapture { [weak self] in
+            let live = ProcessInfo.processInfo.systemUptime
+            Task { @MainActor in self?.microphoneLive(take: id, after: live - asked) }
+        }
+        recorder.start(microphoneUID: settings.microphoneUID, into: capture) { [weak self] _ in
+            Task { @MainActor in self?.microphoneFailed(take: id) }
+        }
         var apple: Task<AppleSpeechSession, Error>?
         if plan.transcriber == .apple {
             let dictionary = settings.dictionary
@@ -151,6 +153,20 @@ final class DictationController {
         model.liveText = ""
         flashTask?.cancel()
         model.flash = nil
+        startMeter()
+        Log.take.info("take \(id) started (\(plan.label, privacy: .public))")
+    }
+
+    /**
+     * The first audio arrived: the microphone is really listening now. This is
+     * when the chime means something — played on the press it would promise a
+     * microphone that may still be switching on, and with a Bluetooth headset
+     * the profile switch would swallow it anyway.
+     */
+    private func microphoneLive(take id: Int, after seconds: TimeInterval) {
+        guard current?.id == id else { return }
+        Log.audio.info("take \(id): first audio after \(Int(seconds * 1000)) ms")
+        let settings = model.settings
         if settings.chime { Chime.play() }
         if settings.lowerAudio {
             // Lowering the output lowers the chime too, so let it ring first.
@@ -160,7 +176,14 @@ final class DictationController {
                 ducker.lower()
             }
         }
-        startMeter()
+    }
+
+    private func microphoneFailed(take id: Int) {
+        guard current?.id == id else { return }
+        apply(gesture.cancel())
+        flash(Permissions.microphone == .authorized
+            ? "The microphone wouldn't open"
+            : "whisp needs microphone access — see Settings", force: true)
     }
 
     private func finishTake() {
@@ -183,10 +206,11 @@ final class DictationController {
             } catch is CancellationError {
                 text = ""
             } catch {
-                NSLog("whisp: take \(take.id) failed: \(error)")
+                Log.take.error("take \(take.id) failed: \(error.localizedDescription, privacy: .public)")
                 flash(error.localizedDescription)
                 text = ""
             }
+            Log.take.info("take \(take.id) settled: \(text.count) characters")
             if !text.isEmpty {
                 model.record(text: text, seconds: take.capture.duration, engine: take.plan.label)
             }
@@ -273,6 +297,9 @@ final class DictationController {
             MainActor.assumeIsolated {
                 guard let self, let take = self.current else { return }
                 self.model.pushLevel(take.capture.level)
+                // A few times a second, make sure the tap hasn't missed the release.
+                self.meterTicks += 1
+                if self.gesture.holding, self.meterTicks % 8 == 0 { self.hotkey.resync() }
             }
         }
     }
