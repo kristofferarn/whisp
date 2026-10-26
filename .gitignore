@@ -1,6 +1,6 @@
-node_modules/
-out/
-dist/
-release/
-*.log
+.build/
+build/
+.swiftpm/
+*.xcodeproj/
+DerivedData/
 .DS_Store

@@ -1,72 +1,85 @@
 # whisp
 
-System-wide push-to-talk dictation for Windows. Hold **Ctrl+Win** anywhere,
-speak, release — the transcript is pasted into whatever has focus. Never
-submitted: pressing Enter stays your job.
+Push-to-talk dictation for macOS. Hold **🌐 Fn** anywhere, speak, release.
+The text is pasted into whatever has focus. It is never sent: pressing
+Return stays your job.
 
-Or **double-tap Ctrl+Win** to go hands-free: whisp keeps listening with
-nothing held down, so you can look things up mid-sentence. Tap once more —
-with the input you want focused — and the transcript lands there.
+**Double-tap 🌐** to go hands-free: whisp keeps listening with nothing held,
+so you can look things up mid-sentence. Tap once more, with the field you
+want focused, and the text lands there. **Esc** throws a take away.
 
-Extracted from [SPCE](https://github.com/kristofferarn)'s "Whisper" feature
-into a standalone tray app.
+> whisp started life as an Electron app for Windows (hold Ctrl+Win). That
+> version lives on the [`windows`](../../tree/windows) branch; tag `v0.6.1` is
+> its last release.
 
 ## How it works
 
-- **Hotkey** — a 50ms `GetAsyncKeyState` poll via [koffi](https://koffi.dev)
-  FFI (Electron's `globalShortcut` has no keyup, so a modifier-only hold is
-  inexpressible there). Presses shorter than 300ms keep the mic open for a
-  400ms window in case a second tap arrives; two taps latch the take into a
-  hands-free session, capped at 5 minutes.
-- **Capture** — a hidden renderer window records with
-  `getUserMedia`/`MediaRecorder` (webm/opus) and gates out silent takes.
-- **Playback** — while the microphone is open, optionally lowers Windows
-  output or pauses active media sessions, then restores what whisp changed.
-- **Transcription** — OpenAI `POST /v1/audio/transcriptions` with
-  `gpt-4o-mini-transcribe` or `gpt-transcribe` (a Settings knob), biased by
-  your Dictionary words (`keywords[]` on gpt-transcribe, `prompt` on mini)
-  and hinted with your spoken languages.
-- **Cleanup** — optionally, one `POST /v1/responses` on `gpt-5.4-nano` with
-  reasoning off: fillers and false starts out, "scratch that" applied,
-  punctuation fixed. Any failure pastes the raw transcript instead.
-- **Paste** — clipboard-carried: snapshot, `Ctrl+V` via `SendInput`, restore.
-  If the paste can't happen, the transcript stays on the clipboard.
-- **UI** — a floating pill while dictating; a tray icon always; a settings
-  window on demand (Listen: mic and gestures; Transcribe: key, model,
-  languages, dictionary; History; Stats).
+- **Menu bar app** with no Dock icon. The menu bar popover shows the status,
+  switches between engines, lists recent dictations and opens Settings.
+- **Key**: a Quartz event tap watches 🌐 Fn (or Right ⌥, or ⌃⌥). Pressing any
+  other key while it is held (Fn+←, Fn+Delete…) means you used Fn as a
+  modifier, so that take is cancelled.
+- **Pill**: a small island grows out of the notch while you talk, with live
+  words on the on-device engine. On displays without a notch it is a glass
+  capsule at the top of the screen.
+- **Transcribe**, as you choose per step:
+  - *On-device*: Apple's SpeechAnalyzer. English uses SpeechTranscriber,
+    Norwegian uses DictationTranscriber. It's free, private, works offline
+    and shows words while you speak.
+  - *OpenAI*: `gpt-transcribe` or `gpt-4o-mini-transcribe`, with your
+    Dictionary as keywords and your languages as hints.
+- **Clean up** (optional): removes fillers, applies "scratch that", fixes
+  punctuation. Runs on *Apple Intelligence* (on-device Foundation Models) or
+  *OpenAI* (`gpt-5.4-nano`). Any failure pastes the raw transcript instead.
+- **Paste**: the transcript goes on the clipboard (marked transient, so
+  clipboard managers skip it), whisp sends ⌘V, and then puts your previous
+  clipboard back. Takes paste in the order you spoke them, even when the
+  network answers out of order.
 
-## Development
+## Building
 
-```
-npm install        # postinstall downloads the Electron binary
-npm run dev        # run the app
-npm run typecheck  # tsc --noEmit
-npm run build      # typecheck + electron-vite build
-npm run smoke:ffi  # verify koffi + user32 under Electron's ABI
-npm run gen:icons  # derive tray icons + whisp.ico from resources/logo.png
-```
-
-The OpenAI API key is entered in Settings (opens automatically on first run)
-and stored DPAPI-encrypted in `%APPDATA%/whisp` (`%APPDATA%/whisp-dev` for
-dev runs — the two worlds share nothing, including the single-instance lock).
-
-## Releasing
-
-Bump `version` in package.json, commit, then:
+Needs macOS 26 or later and Swift 6.2 or later. The Xcode Command Line Tools
+are enough; Xcode is optional (open `Package.swift` in it if you like).
 
 ```
-git tag v<version> && git push --tags
+scripts/run.sh                      # build "whisp dev" and run it, logs in the terminal
+scripts/build.sh release --install  # build whisp.app and copy it to /Applications
+swift test                          # gesture, queue, settings and cleanup tests
 ```
 
-The Release workflow builds the NSIS installer on windows-latest and
-publishes it as a GitHub release (draft-first, so updaters never see a
-half-uploaded release). Installed apps check for updates on launch and
-every 6 hours; an update installs from the tray's "Restart to update"
-item, or silently on next quit. `npm run package` builds the installer
-locally into `release/` without publishing.
+The dev build is a separate app (`com.kristofferarn.whisp.dev`) with its own
+settings, history and permissions, so it can run next to the installed one.
+Mute one of them from its menu bar popover, or both will paste.
 
-## Notes
+To test the engines without a microphone, run a sound file through the
+current engines:
 
-- Two dictation hosts (e.g. whisp plus an SPCE build still running Whisper,
-  or whisp-dev next to installed whisp) both fire on the same press — mute
-  one from its tray.
+```
+say -o /tmp/take.aiff "um so the meeting is on Tuesday, no wait, Wednesday"
+"build/whisp dev.app/Contents/MacOS/Whisp" --transcribe /tmp/take.aiff
+```
+
+### A stable signing certificate (do this once)
+
+macOS ties the Microphone, Accessibility and Input Monitoring permissions to
+the app's signature. Without a certificate the build is signed ad-hoc, and
+every rebuild has to be granted those permissions again. To avoid that:
+
+1. Open **Keychain Access** (Spotlight finds it).
+2. Choose **Keychain Access → Certificate Assistant → Create a Certificate…**
+3. Name: `whisp Dev`. Identity Type: **Self-Signed Root**. Certificate Type:
+   **Code Signing**. Click **Create**.
+
+`scripts/build.sh` finds it by name (override with `WHISP_SIGN_IDENTITY`).
+
+### First run
+
+whisp's welcome window walks through these steps:
+
+- **Microphone** permission.
+- **Accessibility** permission, used both to see the key and to send ⌘V.
+- **System Settings → Keyboard → "Press 🌐 key to" → Do Nothing**, so macOS's
+  own dictation and emoji picker don't react to the same key.
+- Downloading Apple's speech model for your language, if you use the
+  on-device engine.
+- An OpenAI API key, if you use OpenAI. It's stored in the Keychain.
