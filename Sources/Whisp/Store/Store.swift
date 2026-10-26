@@ -12,9 +12,12 @@ struct Store {
     static let historyMax = 500
 
     let directory: URL
+    /** False for throwaway sample data (snapshots): nothing is read or written. */
+    let persistent: Bool
     private let queue = DispatchQueue(label: "whisp.store")
 
-    init() {
+    init(persistent: Bool = true) {
+        self.persistent = persistent
         let isDev = Bundle.main.bundleIdentifier?.hasSuffix(".dev") ?? true
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         directory = base.appendingPathComponent(isDev ? "whisp-dev" : "whisp", isDirectory: true)
@@ -22,12 +25,12 @@ struct Store {
     }
 
     func load<T: Decodable>(_ name: String, as type: T.Type) -> T? {
-        guard let data = try? Data(contentsOf: directory.appendingPathComponent(name)) else { return nil }
+        guard persistent, let data = try? Data(contentsOf: directory.appendingPathComponent(name)) else { return nil }
         return try? Self.decoder.decode(T.self, from: data)
     }
 
     func save<T: Encodable>(_ name: String, _ value: T) {
-        guard let data = try? Self.encoder.encode(value) else { return }
+        guard persistent, let data = try? Self.encoder.encode(value) else { return }
         let url = directory.appendingPathComponent(name)
         queue.async {
             do {

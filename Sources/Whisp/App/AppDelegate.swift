@@ -16,6 +16,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
 
+        #if DEBUG
+        if Snapshots.requested {
+            Task {
+                let status = await Snapshots.run(windows: windows)
+                exit(status)
+            }
+            return
+        }
+        #endif
+
         if CommandLineMode.requested {
             Task {
                 let status = await CommandLineMode.run(model: model)

@@ -17,7 +17,7 @@ enum Phase: Equatable {
  */
 @Observable
 final class AppModel {
-    @ObservationIgnored private let store = Store()
+    @ObservationIgnored private let store: Store
 
     var settings: WhispSettings {
         didSet {
@@ -61,12 +61,14 @@ final class AppModel {
 
     static let levelCount = 28
 
-    init() {
+    /** `sample` starts from defaults and never touches disk or the Keychain. */
+    init(sample: Bool = false) {
+        store = Store(persistent: !sample)
         settings = store.load("settings.json", as: WhispSettings.self) ?? WhispSettings()
         history = store.load("history.json", as: [HistoryEntry].self) ?? []
         stats = store.load("stats.json", as: Stats.self) ?? Stats()
         lastTranscript = history.first?.text
-        keyLast4 = Keychain.read().map { String($0.suffix(4)) }
+        keyLast4 = sample ? nil : Keychain.read().map { String($0.suffix(4)) }
     }
 
     var hasKey: Bool { keyLast4 != nil }

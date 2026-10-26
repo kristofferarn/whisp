@@ -59,6 +59,14 @@ say -o /tmp/take.aiff "um so the meeting is on Tuesday, no wait, Wednesday"
 "build/whisp dev.app/Contents/MacOS/Whisp" --transcribe /tmp/take.aiff
 ```
 
+To check the UI without screen recording, debug builds can render every
+Settings pane, the popover, the welcome window and the pill states to PNGs
+(add `--dark` for dark mode):
+
+```
+"build/whisp dev.app/Contents/MacOS/Whisp" --snapshot /tmp/whisp-snapshots
+```
+
 ### A stable signing certificate (do this once)
 
 macOS ties the Microphone, Accessibility and Input Monitoring permissions to
